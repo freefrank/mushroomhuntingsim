@@ -51,7 +51,7 @@ function drawMound(m){
 function drawGrassPatch(g){
   const pd=Math.hypot(player.x-g.x,player.y-g.y);
   const inP=pd<g.r+10;
-  g.bent+=(inP?1:-1)*.15;g.bent=Math.max(0,Math.min(1,g.bent));
+  g.bent+=(inP?1:-1)*.15*dtf;g.bent=Math.max(0,Math.min(1,g.bent));
   ctx.lineCap='round';ctx.lineWidth=1.6;
   for(const b of g.blades){
     const bx=g.x+b.dx,by=g.y+b.dy;
@@ -81,19 +81,19 @@ function drawPlayer(){
 /* weather + particles */
 function spawnWeather(){
   const w=state.weather;
-  if(w==='rain'&&wparts.length<180)for(let i=0;i<6;i++)wparts.push({k:'rain',x:Math.random()*(VW+120)-60,y:-10,vx:-1.4,vy:13,l:70});
-  if(w==='snow'&&wparts.length<140)wparts.push({k:'snow',x:Math.random()*VW,y:-6,vx:(Math.random()-.5)*.8,vy:1+Math.random()*.9,l:700,ph:Math.random()*6.28,s:1+Math.random()*1.6});
-  if(w==='leaf'&&wparts.length<40&&Math.random()<.14)wparts.push({k:'leaf',x:Math.random()*VW,y:-8,vx:.7+Math.random()*1,vy:1+Math.random()*1,l:640,ph:Math.random()*6.28,rot:Math.random()*6.28,c:pick(Math.random,['#c86a25','#d98a3a','#b5471f','#e0a51f'])});
-  if(w==='firefly'&&wparts.length<34&&Math.random()<.12)wparts.push({k:'fly',x:Math.random()*VW,y:Math.random()*VH,vx:0,vy:0,l:900,ph:Math.random()*6.28});
+  if(w==='rain'&&wparts.length<180)for(let i=0;i<Math.ceil(6*dtf);i++)wparts.push({k:'rain',x:Math.random()*(VW+120)-60,y:-10,vx:-1.4,vy:13,l:70});
+  if(w==='snow'&&wparts.length<140)for(let i=0;i<Math.ceil(dtf);i++)wparts.push({k:'snow',x:Math.random()*VW,y:-6,vx:(Math.random()-.5)*.8,vy:1+Math.random()*.9,l:700,ph:Math.random()*6.28,s:1+Math.random()*1.6});
+  if(w==='leaf'&&wparts.length<40&&Math.random()<.14*dtf)wparts.push({k:'leaf',x:Math.random()*VW,y:-8,vx:.7+Math.random()*1,vy:1+Math.random()*1,l:640,ph:Math.random()*6.28,rot:Math.random()*6.28,c:pick(Math.random,['#c86a25','#d98a3a','#b5471f','#e0a51f'])});
+  if(w==='firefly'&&wparts.length<34&&Math.random()<.12*dtf)wparts.push({k:'fly',x:Math.random()*VW,y:Math.random()*VH,vx:0,vy:0,l:900,ph:Math.random()*6.28});
 }
 function stepWeather(){
   spawnWeather();
   for(let i=wparts.length-1;i>=0;i--){
     const p=wparts[i];
-    if(p.k==='snow'||p.k==='leaf'){p.x+=p.vx+Math.sin(tnow/500+p.ph)*1;p.y+=p.vy;if(p.rot!=null)p.rot+=.04;}
-    else if(p.k==='fly'){p.x+=Math.sin(tnow/700+p.ph)*.9;p.y+=Math.cos(tnow/900+p.ph)*.6;}
-    else{p.x+=p.vx;p.y+=p.vy;}
-    p.l--;
+    if(p.k==='snow'||p.k==='leaf'){p.x+=(p.vx+Math.sin(tnow/500+p.ph)*1)*dtf;p.y+=p.vy*dtf;if(p.rot!=null)p.rot+=.04*dtf;}
+    else if(p.k==='fly'){p.x+=Math.sin(tnow/700+p.ph)*.9*dtf;p.y+=Math.cos(tnow/900+p.ph)*.6*dtf;}
+    else{p.x+=p.vx*dtf;p.y+=p.vy*dtf;}
+    p.l-=dtf;
     if(p.l<=0||p.y>VH+8||p.x<-12||p.x>VW+12){
       if(p.k==='rain'&&p.y>VH-40&&ripples.length<24)
         ripples.push({x:p.x+cam.x*0,y:0,vx:0,vy:0,vr:0,r:1,l:20,sx:p.x,sy:VH-Math.random()*VH*.85});
@@ -117,7 +117,7 @@ function stepWeather(){
     }
   }
   for(let i=ripples.length-1;i>=0;i--){
-    const r=ripples[i];r.r+=1.1;r.l--;
+    const r=ripples[i];r.r+=1.1*dtf;r.l-=dtf;
     if(r.l<=0){ripples.splice(i,1);continue;}
     ctx.strokeStyle='rgba(210,230,245,'+(r.l/20*.4)+')';ctx.lineWidth=1;
     ctx.beginPath();ctx.ellipse(r.sx,r.sy,r.r,r.r*.34,0,0,7);ctx.stroke();
@@ -170,7 +170,7 @@ function seasonTint(){
 function stepSparts(){
   for(let i=sparts.length-1;i>=0;i--){
     const p=sparts[i];
-    p.x+=p.vx;p.y+=p.vy;p.vy+=p.g||0;p.l--;
+    p.x+=p.vx*dtf;p.y+=p.vy*dtf;p.vy+=(p.g||0)*dtf;p.l-=dtf;
     if(p.l<=0){sparts.splice(i,1);continue;}
     const a=Math.min(1,p.l/24);
     ctx.globalAlpha=a;ctx.fillStyle=p.c;
@@ -186,7 +186,7 @@ function puff(x,y,col,n){
 }
 let lureT=0;
 function stepLures(){
-  lureT-=16;
+  lureT-=16.7*dtf;
   if(lureT<=0){
     lureT=620;
     for(const m of mushrooms){
@@ -198,7 +198,7 @@ function stepLures(){
       }
     }
   }
-  guideT-=16;
+  guideT-=16.7*dtf;
   const onScreen=mushrooms.some(m=>!m.picked&&m.revealed&&
     m.x>cam.x-16&&m.x<cam.x+VW+16&&m.y>cam.y-16&&m.y<cam.y+VH+16);
   const remain=mushrooms.filter(m=>!m.picked);
@@ -214,8 +214,12 @@ function stepLures(){
   }
 }
 
+let lastT=0,dtf=1,fpsN=0,fpsT=0;
+const fpsEl=document.getElementById('fps');
 function loop(t){
   tnow=t;requestAnimationFrame(loop);
+  dtf=Math.min(4,Math.max(.25,lastT?(t-lastT)/16.667:1));lastT=t;
+  fpsN++;if(t-fpsT>500){fpsEl.textContent=Math.round(fpsN*1000/(t-fpsT))+' FPS';fpsT=t;fpsN=0;}
   if(paused)return;
   const p=player;let vx=0,vy=0;const spd=2.9;
   if(keys.left)vx-=1;if(keys.right)vx+=1;if(keys.up)vy-=1;if(keys.down)vy+=1;
@@ -226,14 +230,15 @@ function loop(t){
     if(d>4){vx=dx/d;vy=dy/d;}else target=null;
   }
   if(vx||vy){
-    const d=Math.hypot(vx,vy)||1;p.x+=vx/d*spd;p.y+=vy/d*spd;
-    p.moving=true;p.phase+=.3;
+    const d=Math.hypot(vx,vy)||1;p.x+=vx/d*spd*dtf;p.y+=vy/d*spd*dtf;
+    p.moving=true;p.phase+=.3*dtf;
     if(Math.abs(vx)>Math.abs(vy)*1.2){p.dir=2;p.flip=vx<0;}
     else if(vy<0)p.dir=1;else if(vy>0)p.dir=0;
   }else p.moving=false;
   p.x=Math.max(20,Math.min(WW-20,p.x));p.y=Math.max(40,Math.min(WH-12,p.y));
   const tx=Math.max(0,Math.min(WW-VW,p.x-VW/2)),ty=Math.max(0,Math.min(WH-VH,p.y-VH/2));
-  cam.x+=(tx-cam.x)*.1;cam.y+=(ty-cam.y)*.1;
+  const clerp=1-Math.pow(.9,dtf);
+  cam.x+=(tx-cam.x)*clerp;cam.y+=(ty-cam.y)*clerp;
 
   activeM=null;let bestD=1e9;
   for(const m of mushrooms){
@@ -245,7 +250,7 @@ function loop(t){
         puff(m.x,m.y,'#efe6cf',8);
       }
     }
-    if(m.revealed&&m.pop<1)m.pop=Math.min(1,m.pop+.1);
+    if(m.revealed&&m.pop<1)m.pop=Math.min(1,m.pop+.1*dtf);
     if(m.revealed){
       const d=Math.hypot(m.x-p.x,m.y-p.y);
       if(d<40&&d<bestD){bestD=d;activeM=m;}

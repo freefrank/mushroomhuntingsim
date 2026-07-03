@@ -12,8 +12,9 @@ const stageEl=document.getElementById('stage');
 function resizeView(){
   const w=stageEl.clientWidth,h=stageEl.clientHeight;
   if(!w||!h)return;
-  DPR=Math.min(window.devicePixelRatio||1,2);
-  ZOOM=Math.max(.6,Math.min(1.05,Math.sqrt(w*h)/900));
+  DPR=Math.min(window.devicePixelRatio||1,2,Math.sqrt(4500000/(w*h))||1);
+  DPR=Math.max(.5,DPR);
+  ZOOM=Math.max(.6,Math.min(1.05*Math.max(1,w/1920),Math.sqrt(w*h)/900));
   ZOOM=Math.max(ZOOM,w/WW,h/WH);
   VW=w/ZOOM;VH=h/ZOOM;
   scene.width=Math.max(2,Math.round(w*DPR));
