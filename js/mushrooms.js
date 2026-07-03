@@ -7,9 +7,11 @@ function paintMushroom(sp,SS,variant){
     /* P6 6.2：变异重绘——对色板统一做 HSL 变换后再走原绘制流程，形状/纹理逻辑完全不变 */
     a=Object.assign({},sp.art);
     const vc=col=>variantColor(col,variant);
-    for(const k of['cap','cap2','gill','stemC','wartC','scaleC','speckC','umboC','rimC'])
+    /* E1：新增色板字段 poreC 并入同一批 HSL 变换；bandC 为数组，逐项变换 */
+    for(const k of['cap','cap2','gill','stemC','wartC','scaleC','speckC','umboC','rimC','poreC'])
       if(a[k])a[k]=vc(a[k]);
     if(a.glow)a.glow=vc(a.glow);
+    if(a.bandC)a.bandC=a.bandC.map(vc);
   }
   const h=a.h, w=a.w||h;
   const padX=w*0.5+(a.glow?h*0.4:0), padT=h*0.32+(a.glow?h*0.4:0);
@@ -58,6 +60,38 @@ function paintMushroom(sp,SS,variant){
     c.beginPath();c.ellipse(sx,by-sw*.15,sw*.95,sw*.3,0,0,Math.PI);
     c.strokeStyle='rgba(40,26,12,.28)';c.lineWidth=u*.7;c.stroke();
   }
+  /* E1：菌柄网纹（retic，牛肝菌类）/ 疣柄鳞点（scab，疣柄牛肝菌类）—— 叠加于既有 stemPath 之上，任何调用 drawStemX 的形态均可用 */
+  function drawRetic(sx,y0,y1,wb,wt,col){
+    c.save();stemPath(sx,y0,y1,wb,wt);c.clip();
+    c.strokeStyle=rgba(shade(col,-46),.55);c.lineWidth=u*.5;
+    const topFrac=.62, ty=y0-(y0-y1)*topFrac;
+    for(let i=-4;i<=4;i++){
+      c.beginPath();c.moveTo(sx+i*wb*.16,ty);c.lineTo(sx+i*wb*.16+wb*.32,y1+(y0-y1)*.04);c.stroke();
+      c.beginPath();c.moveTo(sx+i*wb*.16,ty);c.lineTo(sx+i*wb*.16-wb*.32,y1+(y0-y1)*.04);c.stroke();
+    }
+    c.restore();
+  }
+  function drawScab(sx,y0,y1,wb,wt,col){
+    c.save();stemPath(sx,y0,y1,wb,wt);c.clip();
+    const scabC=a.wartC||shade(col,-55);
+    const n=Math.max(6,Math.round((y0-y1)/(u*2)));
+    for(let i=0;i<n;i++){
+      const t=rng(), yy=y0-(y0-y1)*t, localW=wb+(wt-wb)*t;
+      const xx=sx+(rng()*2-1)*localW*.34;
+      c.save();c.translate(xx,yy);c.rotate(rng()*3);
+      c.beginPath();c.moveTo(-u*.5,-u*.25);c.quadraticCurveTo(0,-u*.55,u*.5,-u*.2);
+      c.quadraticCurveTo(u*.2,u*.25,-u*.4,u*.2);c.closePath();
+      c.fillStyle=scabC;c.fill();
+      c.restore();
+    }
+    c.restore();
+  }
+  /* 统一入口：绘制常规菌柄后按需叠加 retic/scab，供既有与新形态共用 */
+  function drawStemX(sx,y0,y1,wb,wt,col){
+    drawStem(sx,y0,y1,wb,wt,col);
+    if(a.retic)drawRetic(sx,y0,y1,wb,wt,col);
+    if(a.scab)drawScab(sx,y0,y1,wb,wt,col);
+  }
   function domePath(rimY,cw,ch,shape){
     const hw=cw/2;
     c.beginPath();c.moveTo(cx-hw,rimY);
@@ -94,6 +128,22 @@ function paintMushroom(sp,SS,variant){
       c.restore();
     }
   }
+  /* E1：菌孔底面（pore，牛肝菌类）—— 替代菌褶，密集小圆点纹理，取代 drawGills 的辐射线 */
+  function drawPores(rimY,cw,pcol){
+    c.beginPath();c.ellipse(cx,rimY+cw*.015,cw*.485,cw*.095,0,0,Math.PI*2);
+    const g=c.createRadialGradient(cx,rimY,cw*.05,cx,rimY,cw*.5);
+    g.addColorStop(0,shade(pcol,-22));g.addColorStop(1,pcol);
+    c.fillStyle=g;c.fill();
+    c.strokeStyle='rgba(40,24,10,.2)';c.lineWidth=u*.5;c.stroke();
+    c.save();c.beginPath();c.ellipse(cx,rimY+cw*.015,cw*.47,cw*.088,0,0,Math.PI*2);c.clip();
+    for(let i=0;i<110;i++){
+      const ang=rng()*Math.PI*2, rr=Math.sqrt(rng());
+      const px=cx+Math.cos(ang)*cw*.46*rr, py=rimY+cw*.015+Math.sin(ang)*cw*.085*rr;
+      c.beginPath();c.arc(px,py,u*.32,0,Math.PI*2);
+      c.fillStyle=rgba(shade(pcol,-38),.5);c.fill();
+    }
+    c.restore();
+  }
   function capTexture(rimY,cw,ch,shape){
     c.save();domePath(rimY,cw,ch,shape);c.clip();
     if(a.warts){
@@ -121,6 +171,16 @@ function paintMushroom(sp,SS,variant){
       for(let k=1;k<=4;k++){
         c.lineWidth=cw*.028+u*.3;
         c.beginPath();c.ellipse(cx,rimY-ch*.12,cw*.12*k,ch*.2*k*.55,0,Math.PI*1.05,Math.PI*1.95);
+        c.stroke();
+      }
+    }
+    if(a.concentric){
+      const bands=a.bandC||[shade(cap,-12),shade(cap,12),shade(cap,-28),shade(cap,24),shade(cap,-42)];
+      const k=11;
+      for(let i=0;i<k;i++){
+        const t=i/(k-1);
+        c.strokeStyle=rgba(bands[i%bands.length],.6);c.lineWidth=cw*.02+u*.22;
+        c.beginPath();c.ellipse(cx,rimY-ch*.1,cw*(.05+.45*t),ch*(.08+.5*t),0,Math.PI*1.02,Math.PI*1.98);
         c.stroke();
       }
     }
@@ -182,10 +242,10 @@ function paintMushroom(sp,SS,variant){
     const cw=w*u, ch=h*u*capHF, stemH=h*u-ch*(shape==='bell'?.55:shape==='conical'?.5:1)+ch*(shape==='bell'?.45:shape==='conical'?.5:0);
     const rimY=baseY-(h*u-ch);
     const sw=Math.max(u*2,(a.sw||.24)*cw);
-    drawStem(cx,baseY,rimY-ch*.06,sw*(a.volva?1.15:1.05),sw*.85,stemC);
+    drawStemX(cx,baseY,rimY-ch*.06,sw*(a.volva?1.15:1.05),sw*.85,stemC);
     if(a.volva)drawVolva(cx,baseY,sw,stemC);
     if(a.ring)drawRing(cx,rimY+(baseY-rimY)*.3,sw,stemC);
-    drawGills(rimY,cw,gill,true);
+    if(a.pore)drawPores(rimY,cw,a.poreC||mix(gill,cap,.3));else drawGills(rimY,cw,gill,true);
     domePath(rimY,cw,ch,shape);
     c.fillStyle=capFill(rimY,cw,ch);c.fill();
     c.strokeStyle='rgba(40,24,10,.22)';c.lineWidth=u*.7;c.stroke();
@@ -269,6 +329,17 @@ function paintMushroom(sp,SS,variant){
         c.beginPath();c.moveTo(fw*.2,-fh*.92);
         c.bezierCurveTo(fw*.6,-fh*.95,fw*1.0,-fh*.3,fw*.98,fh*.14);c.stroke();
       }
+      if(a.concentric){
+        const bands=a.bandC||[shade(cap,-18),shade(cap,18),shade(cap,-34),shade(cap,32),shade(cap,-6)];
+        const k=8;
+        for(let i=0;i<k;i++){
+          const t=(i+1)/k;
+          c.strokeStyle=rgba(bands[i%bands.length],.62);c.lineWidth=u*.85;
+          c.beginPath();c.moveTo(0,-fh*t*.9);
+          c.bezierCurveTo(fw*.5*t,-fh*t*.85,fw*.95*t,-fh*.2*t,fw*t*.95,fh*.1*t);
+          c.stroke();
+        }
+      }
       c.restore();
       c.beginPath();c.moveTo(fw*.15,fh*.62);
       c.bezierCurveTo(fw*.5,fh*.78,fw*.9,fh*.62,fw*.99,fh*.16);
@@ -311,7 +382,7 @@ function paintMushroom(sp,SS,variant){
   function drawMorel(){
     const cw=w*u, hh=h*u;
     const stemH=hh*.32, sw=cw*(a.sw||.36);
-    drawStem(cx,baseY,baseY-stemH-u,sw*1.2,sw,stemC);
+    drawStemX(cx,baseY,baseY-stemH-u,sw*1.2,sw,stemC);
     const hy=baseY-stemH-hh*.34, rx=cw*.48, ry=hh*.36;
     c.beginPath();c.ellipse(cx,hy,rx,ry,0,0,Math.PI*2);
     const g=c.createRadialGradient(cx-rx*.35,hy-ry*.4,rx*.15,cx,hy,rx*1.25);
@@ -334,7 +405,7 @@ function paintMushroom(sp,SS,variant){
   function drawBrain(){
     const cw=w*u, hh=h*u;
     const stemH=hh*.24, sw=cw*(a.sw||.4);
-    drawStem(cx,baseY,baseY-stemH-u,sw*1.15,sw,stemC);
+    drawStemX(cx,baseY,baseY-stemH-u,sw*1.15,sw,stemC);
     const hy=baseY-stemH-hh*.36;
     const lobes=[[-cw*.22,hh*.05,cw*.26,hh*.24,-.3],[cw*.2,hh*.02,cw*.28,hh*.26,.35],[0,-hh*.16,cw*.3,hh*.24,.05]];
     for(const[ox,oy,rx,ry,rot]of lobes){
@@ -424,7 +495,7 @@ function paintMushroom(sp,SS,variant){
     const cw=w*u, hh=h*u;
     const rimY=baseY-hh*.18, topY=baseY-hh;
     const sw=cw*(a.sw||.2)*2;
-    drawStem(cx,baseY,rimY,sw,sw*.9,stemC);
+    drawStemX(cx,baseY,rimY,sw,sw*.9,stemC);
     if(a.ring)drawRing(cx,rimY+hh*.06,sw*.62,stemC);
     c.beginPath();
     c.moveTo(cx-cw*.5,rimY);
@@ -454,6 +525,296 @@ function paintMushroom(sp,SS,variant){
     c.beginPath();c.moveTo(cx-cw*.3,topY+hh*.14);c.quadraticCurveTo(cx-cw*.36,rimY-hh*.24,cx-cw*.32,rimY-hh*.1);c.stroke();
   }
 
+  /* E1 新形态：猴头菇/齿菌——圆顶下（或整体）垂满细刺，刺根先画，圆顶盖在上方遮住刺根衔接处 */
+  function drawSpine(){
+    const cw=w*u, hh=h*u;
+    const hasStem=a.sw!=null;
+    const sw=cw*(a.sw||0);
+    const stemH=hasStem?hh*.18:0;
+    if(hasStem)drawStemX(cx,baseY,baseY-stemH-u,sw*1.05,sw*.85,stemC);
+    const fringeH=hh*.4, ch=hh*.54;
+    const rimY=baseY-stemH-fringeH;
+    const spineCol=a.gill||mix(cap,'#ffffff',.5);
+    const n=Math.max(11,Math.round(cw/(u*1.3)));
+    for(let i=0;i<n;i++){
+      const t=n===1?.5:i/(n-1);
+      const bx=cx+(t-.5)*cw*.9;
+      const by=rimY-ch*.02+Math.sin(t*Math.PI)*ch*.03;
+      const len=fringeH*(.62+rng()*.34)*(0.6+0.4*Math.sin(t*Math.PI));
+      const wd=cw*.02+rng()*cw*.012;
+      c.beginPath();
+      c.moveTo(bx-wd,by);
+      c.quadraticCurveTo(bx-wd*.3,by+len*.6,bx,by+len);
+      c.quadraticCurveTo(bx+wd*.3,by+len*.6,bx+wd,by);
+      c.closePath();
+      const g=c.createLinearGradient(bx,by,bx,by+len);
+      g.addColorStop(0,shade(spineCol,-10));g.addColorStop(1,mix(spineCol,'#ffffff',.3));
+      c.fillStyle=g;c.fill();
+      c.strokeStyle='rgba(40,24,10,.14)';c.lineWidth=u*.35;c.stroke();
+    }
+    domePath(rimY,cw,ch,'convex');
+    c.fillStyle=capFill(rimY,cw,ch);c.fill();
+    c.strokeStyle='rgba(40,24,10,.22)';c.lineWidth=u*.7;c.stroke();
+    capTexture(rimY,cw,ch,'convex');
+    capShine(rimY,cw,ch);
+  }
+
+  /* 白鬼笔/竹荪共用主体：细长海绵柄 + 深色黏头，可选蛋形托 volva；返回关键 Y 坐标供 veiled 加裙 */
+  function drawStinkhornCore(){
+    const cw=w*u, hh=h*u, sw=cw*(a.sw||.22);
+    const stemH=hh*.72, topY=baseY-stemH-u;
+    if(a.volva)drawVolva(cx,baseY,sw*1.3,stemC);
+    drawStemX(cx,baseY,topY,sw*1.05,sw*.9,stemC);
+    c.save();stemPath(cx,baseY,topY,sw*1.05,sw*.9);c.clip();
+    for(let i=0;i<Math.round(stemH/(u*3));i++){
+      const yy=baseY-rng()*stemH, xx=cx+(rng()*2-1)*sw*.35;
+      c.beginPath();c.ellipse(xx,yy,sw*.12,sw*.18,0,0,Math.PI*2);
+      c.strokeStyle=rgba(shade(stemC,-30),.35);c.lineWidth=u*.4;c.stroke();
+    }
+    c.restore();
+    const headH=hh*.24, headW=cw*.6;
+    c.beginPath();
+    c.moveTo(cx-headW/2,topY);
+    c.bezierCurveTo(cx-headW*.55,topY-headH*.75,cx-headW*.3,topY-headH,cx,topY-headH);
+    c.bezierCurveTo(cx+headW*.3,topY-headH,cx+headW*.55,topY-headH*.75,cx+headW/2,topY);
+    c.quadraticCurveTo(cx,topY+headH*.12,cx-headW/2,topY);
+    c.closePath();
+    const g=c.createRadialGradient(cx-headW*.15,topY-headH*.7,headW*.05,cx,topY-headH*.4,headW*.7);
+    g.addColorStop(0,shade(cap,20));g.addColorStop(.5,cap);g.addColorStop(1,shade(cap,-40));
+    c.fillStyle=g;c.fill();
+    c.strokeStyle='rgba(30,18,10,.35)';c.lineWidth=u*.6;c.stroke();
+    c.save();c.clip();
+    for(let row=0;row<4;row++)for(let col=0;col<5;col++){
+      const px=cx-headW*.4+col*headW*.2+(row%2?headW*.1:0), py=topY-headH*.15-row*headH*.28;
+      c.strokeStyle=rgba(shade(cap,-55),.5);c.lineWidth=u*.4;
+      c.beginPath();c.moveTo(px-headW*.06,py);c.lineTo(px+headW*.06,py-headH*.05);
+      c.lineTo(px+headW*.02,py+headH*.08);c.closePath();c.stroke();
+    }
+    c.restore();
+    c.strokeStyle='rgba(255,255,255,.32)';c.lineWidth=u*1;
+    c.beginPath();c.ellipse(cx-headW*.18,topY-headH*.65,headW*.12,headH*.18,-.4,-2.6,-1);c.stroke();
+    return{topY,headH,headW};
+  }
+  function drawStinkhorn(){drawStinkhornCore();}
+
+  /* 长裙竹荪：stinkhorn 主体之下加一圈白色网状裙，net 控制网格密度 */
+  function drawVeiled(){
+    const{topY,headW}=drawStinkhornCore();
+    const cw=w*u, hh=h*u;
+    const skirtTopY=topY+hh*.02, skirtLen=hh*.36, skirtTopW=headW*.86, skirtBotW=cw*.92;
+    c.save();c.globalAlpha=.55;
+    c.beginPath();
+    c.moveTo(cx-skirtTopW/2,skirtTopY);
+    c.bezierCurveTo(cx-skirtBotW*.5,skirtTopY+skirtLen*.5,cx-skirtBotW/2,skirtTopY+skirtLen*.9,cx-skirtBotW/2,skirtTopY+skirtLen);
+    c.lineTo(cx+skirtBotW/2,skirtTopY+skirtLen);
+    c.bezierCurveTo(cx+skirtBotW/2,skirtTopY+skirtLen*.9,cx+skirtTopW*.5,skirtTopY+skirtLen*.5,cx+skirtTopW/2,skirtTopY);
+    c.closePath();
+    const skirtC=a.stemC||mix(cap,'#ffffff',.7);
+    c.fillStyle=rgba(mix(skirtC,'#ffffff',.5),.5);c.fill();
+    c.strokeStyle=rgba(shade(skirtC,-20),.4);c.lineWidth=u*.5;c.stroke();
+    c.save();c.clip();
+    const density=typeof a.net==='number'?a.net:7;
+    c.strokeStyle=rgba(shade(skirtC,-30),.55);c.lineWidth=u*.42;
+    for(let i=0;i<=density;i++){
+      const t=i/density;
+      const xTop=cx-skirtTopW/2+skirtTopW*t, xBot=cx-skirtBotW/2+skirtBotW*t;
+      c.beginPath();c.moveTo(xTop,skirtTopY);c.quadraticCurveTo((xTop+xBot)/2,skirtTopY+skirtLen*.6,xBot,skirtTopY+skirtLen);c.stroke();
+    }
+    for(let j=1;j<4;j++){
+      const yy=skirtTopY+skirtLen*j/4, ww=skirtTopW+(skirtBotW-skirtTopW)*j/4;
+      c.beginPath();c.ellipse(cx,yy,ww/2,ww*.06,0,0,Math.PI*2);c.stroke();
+    }
+    c.restore();c.restore();
+  }
+
+  /* 地星：外皮开裂成星芒瓣，中央小球（孢子囊）居中而立。射线锚定在球心，球盖在最上层遮住瓣根，露出瓣尖形成星形轮廓 */
+  function drawEarthstar(){
+    const cw=w*u, hh=h*u;
+    const cy=baseY-hh*.34, r=cw*.22;
+    const nRays=a.rays||7;
+    for(let i=0;i<nRays;i++){
+      const ang=(Math.PI*2*i/nRays)+rf(rng,-.07,.07);
+      const rayLen=r+cw*.34*(0.82+rng()*.32);
+      const rw=cw*.115;
+      c.save();c.translate(cx,cy);c.rotate(ang);
+      c.beginPath();
+      c.moveTo(r*.25,0);
+      c.quadraticCurveTo(rayLen*.55,-rw*.55,rayLen,-rw*.06);
+      c.quadraticCurveTo(rayLen*.55,rw*.62,r*.25,rw*.16);
+      c.closePath();
+      const g=c.createLinearGradient(r*.25,0,rayLen,0);
+      g.addColorStop(0,shade(cap2,-10));g.addColorStop(1,cap);
+      c.fillStyle=g;c.fill();
+      c.strokeStyle='rgba(40,24,10,.25)';c.lineWidth=u*.5;c.stroke();
+      c.restore();
+    }
+    c.beginPath();c.ellipse(cx,cy,r,r*.92,0,0,Math.PI*2);
+    const g2=c.createRadialGradient(cx-r*.3,cy-r*.3,r*.1,cx,cy,r*1.2);
+    g2.addColorStop(0,mix(gill,'#ffffff',.3));g2.addColorStop(.6,gill);g2.addColorStop(1,shade(gill,-30));
+    c.fillStyle=g2;c.fill();
+    c.strokeStyle='rgba(40,24,10,.25)';c.lineWidth=u*.6;c.stroke();
+    c.beginPath();c.moveTo(cx-r*.15,cy-r*.85);c.lineTo(cx,cy-r*1.05);c.lineTo(cx+r*.15,cy-r*.85);
+    c.strokeStyle=rgba(shade(gill,-40),.6);c.lineWidth=u*.6;c.stroke();
+    c.strokeStyle='rgba(255,255,255,.3)';c.lineWidth=u*.9;
+    c.beginPath();c.ellipse(cx-r*.3,cy-r*.32,r*.24,r*.16,-.4,-2.6,-1);c.stroke();
+  }
+
+  /* 鸟巢菌：小酒杯状巢 + 内含数粒卵（周托），杯口一圈内壁色更深 */
+  function drawNest(){
+    const cw=w*u, hh=h*u;
+    const topY=baseY-hh, topW=cw*.86, botW=cw*.32;
+    c.beginPath();
+    c.moveTo(cx-botW/2,baseY);
+    c.bezierCurveTo(cx-botW*.55,baseY-hh*.3,cx-topW*.5,topY+hh*.15,cx-topW/2,topY+hh*.08);
+    c.lineTo(cx+topW/2,topY+hh*.08);
+    c.bezierCurveTo(cx+topW*.5,topY+hh*.15,cx+botW*.55,baseY-hh*.3,cx+botW/2,baseY);
+    c.quadraticCurveTo(cx,baseY+hh*.04,cx-botW/2,baseY);
+    c.closePath();
+    const g=c.createLinearGradient(cx-topW/2,0,cx+topW/2,0);
+    g.addColorStop(0,shade(cap,18));g.addColorStop(.5,cap);g.addColorStop(1,shade(cap,-26));
+    c.fillStyle=g;c.fill();
+    c.strokeStyle='rgba(40,24,10,.28)';c.lineWidth=u*.7;c.stroke();
+    c.beginPath();c.ellipse(cx,topY+hh*.08,topW/2,hh*.09,0,0,Math.PI*2);
+    const ig=c.createRadialGradient(cx,topY+hh*.08,cw*.05,cx,topY+hh*.08,topW/2);
+    ig.addColorStop(0,shade(cap,-40));ig.addColorStop(1,shade(cap,-15));
+    c.fillStyle=ig;c.fill();
+    c.strokeStyle='rgba(40,24,10,.3)';c.lineWidth=u*.6;c.stroke();
+    const eggs=a.eggs||4;
+    for(let i=0;i<eggs;i++){
+      const t=eggs===1?.5:i/(eggs-1);
+      const ex=cx+(t-.5)*topW*.5, ey=topY+hh*.06+rf(rng,-1,1)*u*.6, er=cw*.075;
+      c.beginPath();c.ellipse(ex,ey,er,er*.86,rf(rng,-.3,.3),0,Math.PI*2);
+      const eg=c.createRadialGradient(ex-er*.3,ey-er*.3,er*.1,ex,ey,er);
+      eg.addColorStop(0,mix(gill,'#ffffff',.4));eg.addColorStop(1,shade(gill,-24));
+      c.fillStyle=eg;c.fill();
+      c.strokeStyle='rgba(30,18,10,.3)';c.lineWidth=u*.4;c.stroke();
+    }
+    c.strokeStyle='rgba(255,255,255,.3)';c.lineWidth=u*1;
+    c.beginPath();c.ellipse(cx-topW*.22,baseY-hh*.5,cw*.08,hh*.2,-.3,-2.6,-1);c.stroke();
+  }
+
+  /* 敞口浅碗/元宝：外壁色浅（cap），内壁色深（gill），可选极短柄 */
+  function drawCup(){
+    const cw=w*u, hh=h*u, topW=cw, topY=baseY-hh;
+    if(a.sw)drawStemX(cx,baseY+u*.5,baseY-hh*.06,cw*a.sw*1.1,cw*a.sw*.8,stemC);
+    c.beginPath();
+    c.moveTo(cx-topW/2,topY+hh*.1);
+    c.bezierCurveTo(cx-topW*.56,topY+hh*.55,cx-cw*.12,baseY,cx,baseY);
+    c.bezierCurveTo(cx+cw*.12,baseY,cx+topW*.56,topY+hh*.55,cx+topW/2,topY+hh*.1);
+    c.quadraticCurveTo(cx,topY-hh*.05,cx-topW/2,topY+hh*.1);
+    c.closePath();
+    const og=c.createLinearGradient(cx-topW/2,0,cx+topW/2,0);
+    og.addColorStop(0,shade(cap,14));og.addColorStop(.5,cap);og.addColorStop(1,shade(cap,-22));
+    c.fillStyle=og;c.fill();
+    c.strokeStyle='rgba(40,24,10,.25)';c.lineWidth=u*.7;c.stroke();
+    c.beginPath();c.ellipse(cx,topY+hh*.16,topW*.4,hh*.2,0,0,Math.PI*2);
+    const ig=c.createRadialGradient(cx,topY+hh*.06,cw*.05,cx,topY+hh*.16,topW*.4);
+    ig.addColorStop(0,shade(gill,10));ig.addColorStop(.7,gill);ig.addColorStop(1,shade(gill,-30));
+    c.fillStyle=ig;c.fill();
+    c.strokeStyle='rgba(40,24,10,.2)';c.lineWidth=u*.5;c.stroke();
+    c.strokeStyle='rgba(255,255,255,.32)';c.lineWidth=u*1.1;
+    c.beginPath();c.ellipse(cx-topW*.22,topY+hh*.36,topW*.14,hh*.16,-.3,-2.4,-1);c.stroke();
+  }
+
+  /* 棒状虫草：柄+头两段，头（stroma）用 cap，柄用 stemC，headFrac 控制头占比 */
+  function drawClub(){
+    const cw=w*u, hh=h*u, bw=cw*(a.sw||.28), topY=baseY-hh;
+    const headFrac=a.headFrac!=null?a.headFrac:.34;
+    const bodyCol=a.stemC||stemC;
+    c.beginPath();
+    c.moveTo(cx-bw/2,baseY);
+    c.bezierCurveTo(cx-bw*.54,baseY-hh*.4,cx-bw*.4,topY+hh*headFrac*1.2,cx-bw*.32,topY+hh*headFrac*.6);
+    c.quadraticCurveTo(cx,topY+hh*headFrac*.3,cx+bw*.32,topY+hh*headFrac*.6);
+    c.bezierCurveTo(cx+bw*.4,topY+hh*headFrac*1.2,cx+bw*.54,baseY-hh*.4,cx+bw/2,baseY);
+    c.closePath();
+    const g=c.createLinearGradient(cx-bw/2,0,cx+bw/2,0);
+    g.addColorStop(0,shade(bodyCol,18));g.addColorStop(.5,bodyCol);g.addColorStop(1,shade(bodyCol,-24));
+    c.fillStyle=g;c.fill();
+    c.strokeStyle='rgba(40,24,10,.25)';c.lineWidth=u*.6;c.stroke();
+    if(a.scab){
+      c.save();c.clip();
+      const n=Math.round(hh/(u*2.2));
+      for(let i=0;i<n;i++){
+        const yy=baseY-rng()*hh*(1-headFrac), xx=cx+(rng()*2-1)*bw*.3;
+        c.beginPath();c.arc(xx,yy,u*.5,0,Math.PI*2);c.fillStyle=rgba(shade(bodyCol,-45),.5);c.fill();
+      }
+      c.restore();
+    }
+    if(headFrac>0){
+      c.save();
+      c.beginPath();
+      c.moveTo(cx-bw*.34,topY+hh*headFrac);
+      c.bezierCurveTo(cx-bw*.42,topY+hh*headFrac*.5,cx-bw*.3,topY,cx,topY-u*.3);
+      c.bezierCurveTo(cx+bw*.3,topY,cx+bw*.42,topY+hh*headFrac*.5,cx+bw*.34,topY+hh*headFrac);
+      c.quadraticCurveTo(cx,topY+hh*headFrac*1.15,cx-bw*.34,topY+hh*headFrac);
+      c.closePath();
+      const hg=c.createLinearGradient(cx-bw*.4,0,cx+bw*.4,0);
+      hg.addColorStop(0,shade(cap,16));hg.addColorStop(.5,cap);hg.addColorStop(1,shade(cap,-24));
+      c.fillStyle=hg;c.fill();
+      c.strokeStyle='rgba(40,24,10,.25)';c.lineWidth=u*.6;c.stroke();
+      c.save();c.clip();
+      for(let i=0;i<8;i++){
+        const yy=topY+rng()*hh*headFrac*.9, xx=cx+(rng()*2-1)*bw*.28;
+        c.beginPath();c.arc(xx,yy,u*.5,0,Math.PI*2);c.fillStyle=rgba(shade(cap,-30),.5);c.fill();
+      }
+      c.restore();c.restore();
+    }
+    c.strokeStyle='rgba(255,255,255,.25)';c.lineWidth=u*1;
+    c.beginPath();c.moveTo(cx-bw*.18,baseY-hh*.3);c.quadraticCurveTo(cx-bw*.22,topY+hh*.5,cx-bw*.15,topY+hh*.15);c.stroke();
+  }
+
+  /* 半透明脑叶状胶质团：与 drawBrain 同构但更湿润光亮，透明度交由外层 a.alpha 统一处理 */
+  function drawJelly(){
+    const cw=w*u, hh=h*u, cy=baseY-hh*.4;
+    const lobes=[[-cw*.22,hh*.06,cw*.27,hh*.24,-.3],[cw*.2,hh*.03,cw*.29,hh*.26,.35],[0,-hh*.14,cw*.3,hh*.22,.05],[-cw*.06,hh*.18,cw*.2,hh*.15,-.1]];
+    for(const[ox,oy,rx,ry,rot]of lobes){
+      c.save();c.translate(cx+ox,cy+oy);c.rotate(rot);
+      c.beginPath();c.ellipse(0,0,rx,ry,0,0,Math.PI*2);
+      const g=c.createRadialGradient(-rx*.35,-ry*.4,rx*.08,0,0,rx*1.3);
+      g.addColorStop(0,mix(cap2,'#ffffff',.5));g.addColorStop(.5,cap);g.addColorStop(1,shade(cap,-20));
+      c.fillStyle=g;c.fill();
+      c.strokeStyle=rgba(shade(cap,-30),.35);c.lineWidth=u*.5;c.stroke();
+      c.strokeStyle='rgba(255,255,255,.5)';c.lineWidth=u*.9;
+      c.beginPath();c.ellipse(-rx*.25,-ry*.3,rx*.35,ry*.22,-.4,-2.6,-1);c.stroke();
+      c.restore();
+    }
+  }
+
+  /* 实心球体：硬皮马勃/炭球。复用 warts 表现龟裂纹、slime 表现黑亮壳，无需新增专属 flag */
+  function drawBall(){
+    const cw=w*u, hh=h*u, r=Math.min(cw,hh)*.5, cy=baseY-r-u;
+    c.beginPath();c.ellipse(cx,cy,r,r*.96,0,0,Math.PI*2);
+    const g=c.createRadialGradient(cx-r*.32,cy-r*.38,r*.1,cx,cy,r*1.25);
+    g.addColorStop(0,mix(cap2,'#ffffff',.28));g.addColorStop(.55,cap);g.addColorStop(1,shade(cap,-40));
+    c.fillStyle=g;c.fill();
+    c.strokeStyle='rgba(30,18,10,.3)';c.lineWidth=u*.7;c.stroke();
+    c.save();c.beginPath();c.ellipse(cx,cy,r*.97,r*.93,0,0,Math.PI*2);c.clip();
+    if(a.warts){
+      for(let i=0;i<10;i++){
+        const ang=rng()*Math.PI*2, len=r*(.5+rng()*.5);
+        let px=cx+Math.cos(ang)*r*.15, py=cy+Math.sin(ang)*r*.15, a2=ang;
+        c.beginPath();c.moveTo(px,py);
+        for(let s=0;s<4;s++){a2+=rf(rng,-.5,.5);px+=Math.cos(a2)*len/4;py+=Math.sin(a2)*len/4*.9;c.lineTo(px,py);}
+        c.strokeStyle=rgba(shade(cap,-46),.5);c.lineWidth=u*.55;c.stroke();
+      }
+    }
+    if(a.specks){
+      for(let i=0;i<a.specks;i++){
+        const ang=rng()*Math.PI*2,rr=Math.sqrt(rng())*r*.85;
+        c.beginPath();c.arc(cx+Math.cos(ang)*rr,cy+Math.sin(ang)*rr*.9,u*.7,0,Math.PI*2);
+        c.fillStyle=rgba(a.speckC||'#b9ac8c',.8);c.fill();
+      }
+    }
+    c.restore();
+    if(a.slime){
+      c.strokeStyle='rgba(255,255,255,.55)';c.lineWidth=u*1.6;
+      c.beginPath();c.ellipse(cx-r*.3,cy-r*.4,r*.28,r*.16,-.4,-2.7,-1);c.stroke();
+    }else{
+      c.strokeStyle='rgba(255,255,255,.28)';c.lineWidth=u*1.1;
+      c.beginPath();c.ellipse(cx-r*.28,cy-r*.35,r*.26,r*.18,-.4,-2.6,-1);c.stroke();
+    }
+  }
+
   function drawBody(){
     switch(a.shape){
       case 'funnel':drawFunnel(false);break;
@@ -466,6 +827,15 @@ function paintMushroom(sp,SS,variant){
       case 'truffle':drawPuff(true);break;
       case 'coral':drawCoral();break;
       case 'shaggy':drawShaggy();break;
+      case 'spine':drawSpine();break;
+      case 'stinkhorn':drawStinkhorn();break;
+      case 'veiled':drawVeiled();break;
+      case 'earthstar':drawEarthstar();break;
+      case 'nest':drawNest();break;
+      case 'cup':drawCup();break;
+      case 'club':drawClub();break;
+      case 'jelly':drawJelly();break;
+      case 'ball':drawBall();break;
       default:drawGilled(a.shape);
     }
   }
