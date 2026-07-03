@@ -351,6 +351,102 @@ function stepLures(){
   }
 }
 
+/* ====================== P5 5.3 见小人（彩蛋） ======================
+   触发后 20s：画面波浪扭曲（离屏拷贝逐横带 sin 偏移重绘）+ 屏幕边缘冒出跳舞小蘑菇人 + BGM 变速摆动。
+   全程无负面数值，reduced-motion 时跳过扭曲、只保留小人与文案。 */
+const XIAOREN_MS=20000;
+let xiaorenT=0,xiaorenFigs=[],xiaorenBuf=null;
+function makeXiaorenFig(){
+  const rg=Math.random;
+  const edge=rg()<.7?'bottom':(rg()<.5?'left':'right');
+  let x,y,vx,vy;
+  if(edge==='bottom'){
+    x=rg()<.5?-24:VW+24;y=VH-18-rg()*46;
+    vx=(x<0?1:-1)*(.35+rg()*.3);vy=0;
+  }else if(edge==='left'){
+    x=-24;y=VH*.28+rg()*VH*.5;vx=.45+rg()*.3;vy=(rg()-.5)*.2;
+  }else{
+    x=VW+24;y=VH*.28+rg()*VH*.5;vx=-(.45+rg()*.3);vy=(rg()-.5)*.2;
+  }
+  return {x,y,vx,vy,phase:rg()*6.28,flip:vx<0,color:pick(rg,['#e2a622','#d9893c','#c9363a','#b9884a','#7d4a30'])};
+}
+function triggerXiaoren(){
+  xiaorenT=XIAOREN_MS;
+  const n=rint(Math.random,6,10);
+  xiaorenFigs=[];for(let i=0;i<n;i++)xiaorenFigs.push(makeXiaorenFig());
+  state.flags.xiaoren=true;
+  toast('👁 眼前……全是打着伞跳舞的小人！！');
+  if(typeof checkAch==='function')checkAch();
+  save();
+}
+function xiaorenAlpha(){
+  if(xiaorenT<=0)return 0;
+  const elapsed=XIAOREN_MS-xiaorenT;
+  const fadeIn=Math.min(1,elapsed/800);
+  const fadeOut=Math.min(1,xiaorenT/800);
+  return Math.min(fadeIn,fadeOut);
+}
+function stepXiaoren(){
+  if(xiaorenT<=0)return;
+  xiaorenT=Math.max(0,xiaorenT-16.7*dtf);
+  for(const f of xiaorenFigs){f.x+=f.vx*dtf*2;f.y+=f.vy*dtf*2;f.phase+=.15*dtf;}
+  if(bgmKey&&bgmEls[bgmKey])bgmEls[bgmKey].playbackRate=1+.1*Math.sin(tnow/260);
+  if(xiaorenT<=0){
+    xiaorenFigs=[];
+    if(bgmKey&&bgmEls[bgmKey])bgmEls[bgmKey].playbackRate=1;
+  }
+}
+function drawXiaorenFig(f,alpha){
+  const bob=reduced?0:Math.abs(Math.sin(f.phase))*6;
+  const swing=reduced?0:Math.sin(f.phase)*5;
+  ctx.save();
+  ctx.globalAlpha=alpha;
+  ctx.translate(f.x,f.y-bob);
+  if(f.flip)ctx.scale(-1,1);
+  ctx.strokeStyle='#8a5a2c';ctx.lineWidth=2;ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(-3,0);ctx.lineTo(-3+swing*.4,7);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(3,0);ctx.lineTo(3-swing*.4,7);ctx.stroke();
+  ctx.strokeStyle='#f3e3c0';ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(-4,-9);ctx.lineTo(-8-swing*.3,-3);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(4,-9);ctx.lineTo(8+swing*.3,-3);ctx.stroke();
+  ctx.fillStyle='#f3e3c0';
+  ctx.beginPath();ctx.ellipse(0,-7,5,7,0,0,7);ctx.fill();
+  ctx.strokeStyle='rgba(120,80,30,.5)';ctx.lineWidth=1;ctx.stroke();
+  ctx.fillStyle=f.color; /* 小伞帽：P2 徽记同款奶油描边风格 */
+  ctx.beginPath();ctx.ellipse(0,-15,8,6,0,Math.PI,0);ctx.fill();
+  ctx.strokeStyle='#fff6df';ctx.lineWidth=1.4;ctx.stroke();
+  ctx.beginPath();ctx.arc(0,-13,4,0,7);
+  ctx.fillStyle='#f7ecd2';ctx.fill();
+  ctx.strokeStyle='rgba(180,90,20,.6)';ctx.lineWidth=1;ctx.stroke();
+  ctx.restore();
+}
+function drawXiaorenFigs(){
+  if(xiaorenT<=0||!xiaorenFigs.length)return;
+  const a=xiaorenAlpha();
+  for(const f of xiaorenFigs)drawXiaorenFig(f,a);
+}
+function stepXiaorenDistort(){
+  if(xiaorenT<=0||reduced)return;
+  const decay=xiaorenAlpha();
+  if(decay<=0)return;
+  if(!xiaorenBuf||xiaorenBuf.width!==scene.width||xiaorenBuf.height!==scene.height)
+    xiaorenBuf=mkCanvas(scene.width,scene.height);
+  const bctx=xiaorenBuf.getContext('2d');
+  bctx.clearRect(0,0,xiaorenBuf.width,xiaorenBuf.height);
+  bctx.drawImage(scene,0,0);
+  const pxScale=scene.width/VW;
+  const bands=9,bandH=scene.height/bands;
+  ctx.save();
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.clearRect(0,0,scene.width,scene.height);
+  for(let i=0;i<bands;i++){
+    const off=Math.sin(tnow/260+i*.8)*6*decay*pxScale;
+    const sy=i*bandH,sh=Math.min(bandH+1,scene.height-sy);
+    ctx.drawImage(xiaorenBuf,0,sy,scene.width,sh,off,sy,scene.width,sh);
+  }
+  ctx.restore();
+}
+
 let lastT=0,dtf=1,fpsN=0,fpsT=0;
 const fpsEl=document.getElementById('fps');
 function loop(t){
@@ -361,6 +457,7 @@ function loop(t){
   /* P4 日光节律：进入林地起累计的毫秒时钟（4.3） */
   dayClock+=16.7*dtf;
   checkDuskEdge();
+  stepXiaoren(); /* P5 5.3 见小人：计时/位置更新，与 BGM 变速 */
   /* P2 观察：角色停 0.6s（蹲姿）→ 出鉴别卡，此间冻结移动输入 */
   if(inspectState){
     inspectState.timer-=16.7*dtf;
@@ -373,6 +470,8 @@ function loop(t){
   const p=player;let vx=0,vy=0;
   let spd=2.9;
   if(state.tools.boots&&(state.weather==='rain'||state.biome==='wetland'))spd*=1.25; /* P3 雨靴 */
+  spd*=effMul('speed'); /* P5 5.2：小鸡炖蘑菇 speed buff（+ 灵芝老鸭汤 all.speed） */
+  if(state.weather==='rain'&&state.buffs.rainSpeed)spd*=state.buffs.rainSpeed.v; /* P5：凉拌木耳，雨天与雨靴叠乘 */
   if(!inspectState&&!inspectCardOpen){
     if(keys.left)vx-=1;if(keys.right)vx+=1;if(keys.up)vy-=1;if(keys.down)vy+=1;
     if(vx||vy){target=null;pendingPick=null;}
@@ -399,7 +498,8 @@ function loop(t){
   for(const m of mushrooms){
     if(m.picked)continue;
     if(!m.revealed){
-      const rr2=m.buried?(state.tools.shovel?60:30):m.inGrass?30:44; /* P3 小铲：埋藏土堆可视距离翻倍 */
+      let rr2=m.buried?(state.tools.shovel?60:30):m.inGrass?30:44; /* P3 小铲：埋藏土堆可视距离翻倍 */
+      rr2*=effMul('reveal'); /* P5 5.2：黄油煎鸡油菌 reveal buff（+ 灵芝老鸭汤 all.reveal） */
       if(Math.hypot(m.x-p.x,m.y-p.y)<rr2){
         m.revealed=true;sfxReveal();if(m.inGrass)rustle();
         puff(m.x,m.y,'#efe6cf',8);
@@ -446,6 +546,8 @@ function loop(t){
   let vigA=(state.biome==='grove'&&state.tools.lantern)?.5:1; /* P3 灯笼：暗角减弱 */
   if(dayClock>=duskEndMs())vigA=Math.min(1,vigA+.15); /* P4：暮色暗角略增（4.3） */
   ctx.globalAlpha=vigA;ctx.drawImage(VIG,0,0,VW,VH);ctx.globalAlpha=1;
+  stepXiaorenDistort(); /* P5 5.3：全画面横带波浪扭曲（离屏拷贝再逐带偏移重绘） */
+  drawXiaorenFigs();    /* P5 5.3：跳舞小蘑菇人（叠加在扭曲之上，本身不做扭曲） */
   positionPrompt();
 }
 /* ====================== P4 日光节律：全屏色罩（4.3） ======================

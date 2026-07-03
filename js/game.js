@@ -68,7 +68,8 @@ function closeInspectCard(){
 function startInspect(m){
   if(!m||paused||inspectState||inspectCardOpen||m.picked)return;
   target=null;pendingPick=null;
-  if(state.tools.lens){finishInspect(m);return;} /* P3 放大镜：观察无需蹲下等待，即时出卡 */
+  /* P3 放大镜 / P5 红菇炖汤 instInspect buff：观察无需蹲下等待，即时出卡 */
+  if(state.tools.lens||state.buffs.instInspect){finishInspect(m);return;}
   inspectState={m,timer:600};
 }
 
@@ -81,7 +82,7 @@ function ecoText(sp){
 }
 function doPick(){
   if(!activeM||paused||inspectState||inspectCardOpen)return;
-  if(state.inv.length>=state.cap){toast('🧺 篮子满了，去小屋卖掉些吧');return;}
+  if(state.inv.length>=effCap()){toast('🧺 篮子满了，去小屋卖掉些吧');return;} /* P5：奶油蘑菇汤 buff 时 effCap()=cap+5 */
   const m=activeM;
   const isMimic=!!m.trueId;
   const realId=isMimic?m.trueId:m.id;
@@ -202,6 +203,10 @@ const ACH=[
   {id:'earlymkt',ic:'🌅',t:'赶早市',d:'白昼结束前，单日卖出 8 朵蘑菇',f:s=>dayCounterVal(s,'earlyMarket')>=8},
   {id:'inkgone',ic:'🖤',t:'墨色的教训',d:'让一朵鬼伞类蘑菇自然融化',f:s=>s.inv.some(it=>(it.id==='inky'||it.id==='shaggy')&&it.fr<=0)},
   {id:'moonpicker',ic:'🌙',t:'月下归人',d:'暮色中仍采到第 5 朵蘑菇',f:s=>dayCounterVal(s,'duskPicks')>=5},
+  /* P5 烹饪 buff */
+  {id:'cook1',ic:'🍲',t:'第一口鲜',d:'第一次在灶台做菜',f:s=>s.cooked.length>=1},
+  {id:'xiaoren',ic:'👁️',t:'见到小人了',d:'吃到没炒熟的见手青，触发了彩蛋',f:s=>!!s.flags.xiaoren},
+  {id:'allrecipe',ic:'🍜',t:'满汉全菌',d:'做过全部 10 道菜',f:s=>s.cooked.length>=RECIPES.length},
 ];
 function checkAch(){
   for(const a of ACH){
@@ -231,7 +236,7 @@ function refreshHint(){
 
 /* ====================== HUD & modals ====================== */
 function updateHUD(){
-  document.getElementById('basketN').textContent=state.inv.length+'/'+state.cap;
+  document.getElementById('basketN').textContent=state.inv.length+'/'+effCap();
   document.getElementById('coinN').textContent=state.coins;
   document.getElementById('discN').textContent=state.disc.size;
   document.getElementById('totN').textContent=TOTAL;
@@ -347,9 +352,10 @@ function openAch(){
 document.getElementById('resetBtn').onclick=()=>{
   state.disc.clear();state.ach.clear();state.picks=0;state.count={};
   state.maxDepth=0;state.depth=0;
-  state.flags={rain:false,wood:0,ring:false,winterDisc:0,dogNose:false};state.visited.clear();
+  state.flags={rain:false,wood:0,ring:false,winterDisc:0,dogNose:false,xiaoren:false};state.visited.clear();
   state.coins=0;state.inv=[];state.cap=25;state.day=1;state.orders=[];
   state.tools={};state.buffs={};state.cooked=[];
+  xiaorenT=0;xiaorenFigs=[];
   state.stats={sold:0,earned:0,ordersDone:0,mimicCaught:0,mimicFooled:0};
   save();newField();openAch();updateHUD();toast('进度已重置');
 };
@@ -483,4 +489,10 @@ window.__mh={
   freshness:()=>state.inv.map(i=>i.fr),
   /* 附加调试钩子（非规格必需）：查看当前日光节律阶段，便于精确验收 4.3/4.6 的灯笼时长效果 */
   phase:()=>dayClock<daylightMs()?'day':dayClock<duskEndMs()?'trans':'dusk',
+  /* P5 烹饪 buff 验收钩子 */
+  cook:name=>cookByName(name),
+  buffs:()=>state.buffs,
+  triggerXiaoren,
+  effCap,
+  recipes:()=>RECIPES,
 };

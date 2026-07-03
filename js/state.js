@@ -3,7 +3,7 @@
 const state={
   season:2, biome:'forest', depth:0, maxDepth:0, picks:0,
   disc:new Set(), count:{}, ach:new Set(),
-  flags:{rain:false,wood:0,ring:false,winterDisc:0,dogNose:false},
+  flags:{rain:false,wood:0,ring:false,winterDisc:0,dogNose:false,xiaoren:false},
   visited:new Set(), weather:'clear',
   /* ---- P1 市集 + 委托（0.1 全局数据改造） ---- */
   coins:0,               // 金币
@@ -45,7 +45,7 @@ async function load(){
     state.maxDepth=d.maxDepth||0;state.picks=d.picks||0;
     state.disc=new Set((d.disc||[]).filter(id=>SPMAP[id]));state.count=d.count||{};
     state.ach=new Set(d.ach||[]);
-    state.flags=Object.assign({rain:false,wood:0,ring:false,winterDisc:0,dogNose:false},d.flags||{});
+    state.flags=Object.assign({rain:false,wood:0,ring:false,winterDisc:0,dogNose:false,xiaoren:false},d.flags||{});
     state.visited=new Set(d.visited||[]);
     /* v2+ 字段：旧档（无 v，或字段缺失）一律给默认值，旧的数字 basket 直接丢弃 */
     state.coins=typeof d.coins==='number'&&d.coins>=0?d.coins:0;

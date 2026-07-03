@@ -247,6 +247,28 @@
   .buybtn:active{transform:translateY(1px)}
   .buybtn:disabled{opacity:.4;cursor:not-allowed;filter:grayscale(.5)}
 
+  /* ---------- hut: 灶台（P5 烹饪 buff） ---------- */
+  .recipelist{display:flex;flex-direction:column;gap:8px}
+  .reciperow{background:#fbf6e8;border:1px solid #c9b183;border-radius:12px;padding:10px 13px}
+  .reciperow.done{box-shadow:inset 0 0 0 1px rgba(217,164,65,.6)}
+  .ringhead{display:flex;align-items:flex-start;gap:10px}
+  .ric{font-size:26px;flex:none;width:32px;text-align:center}
+  .rinfo{flex:1;min-width:0}
+  .rname{font-size:15px;color:#3d2f1a;font-weight:700}
+  .rdone{color:#2e7d32}
+  .ring{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:5px}
+  .ring-ing{display:inline-flex;align-items:center;gap:2px;font-size:12.5px;color:#5a4526;
+    background:#f0e6cc;border-radius:8px;padding:2px 7px}
+  .ring-ing img{width:18px;height:18px;object-fit:contain}
+  .ring-or{font-size:12px;color:#a97f2b}
+  .reffect{font-size:13px;color:#6b5335;margin-top:7px;line-height:1.5}
+  .rmissing{font-size:12px;color:#a04030;margin-top:3px}
+  .cookbtn{margin-top:8px;font-family:inherit;font-size:13.5px;border:1px solid #8a6a20;
+    background:linear-gradient(180deg,#ecc46b,#cf9a33);color:#31230a;border-radius:9px;
+    padding:6px 14px;cursor:pointer;font-weight:700}
+  .cookbtn:active{transform:translateY(1px)}
+  .cookbtn:disabled{opacity:.4;cursor:not-allowed;filter:grayscale(.5)}
+
   @media (max-width:420px){
     .act{font-size:13.5px;padding:10px 3px}
   }

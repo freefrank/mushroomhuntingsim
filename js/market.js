@@ -89,7 +89,7 @@ function itemPrice(it){
 function renderSellList(){
   const capEl=document.getElementById('hutCapN'),invEl=document.getElementById('hutInvN');
   if(invEl)invEl.textContent=state.inv.length;
-  if(capEl)capEl.textContent=state.cap;
+  if(capEl)capEl.textContent=effCap();
   const wrap=document.getElementById('sellList');if(!wrap)return;
   wrap.innerHTML='';
   const discardBtn=document.getElementById('discardTaintedBtn');
@@ -193,8 +193,9 @@ function deliver(i){
     if(it.id===o.spId&&!it.tainted&&it.fr>=.5&&removed<o.qty){removed++;return false;}
     return true;
   });
-  state.coins+=o.reward;state.stats.ordersDone++;
-  toast('✅ 交付成功——'+o.npc.split('：')[0]+'道了声谢，+'+o.reward+' 🪙');
+  const reward=state.buffs.orderBonus?Math.round(o.reward*state.buffs.orderBonus.v):o.reward; /* P5：椒盐马勃排 +30% */
+  state.coins+=reward;state.stats.ordersDone++;
+  toast('✅ 交付成功——'+o.npc.split('：')[0]+'道了声谢，+'+reward+' 🪙');
   state.orders.splice(i,1);
   ensureOrders();
   updateHUD();checkAch();save();
@@ -253,17 +254,19 @@ function renderToolList(){
 let hutTab='sell';
 function setHutTab(tab){
   hutTab=tab;
-  const sellPane=document.getElementById('hutSell'),ordPane=document.getElementById('hutOrders'),toolPane=document.getElementById('hutTools');
+  const sellPane=document.getElementById('hutSell'),ordPane=document.getElementById('hutOrders'),
+    toolPane=document.getElementById('hutTools'),cookPane=document.getElementById('hutCook');
   if(sellPane)sellPane.style.display=tab==='sell'?'block':'none';
   if(ordPane)ordPane.style.display=tab==='orders'?'block':'none';
   if(toolPane)toolPane.style.display=tab==='tools'?'block':'none';
+  if(cookPane)cookPane.style.display=tab==='cook'?'block':'none';
   document.querySelectorAll('#hutTabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===tab));
 }
 function openHut(){
   ensureOrders();
   const fc=forecast(),fcEl=document.getElementById('hutForecast');
   if(fcEl)fcEl.textContent='明日：'+(WEATHER_ICON[fc]||'')+' '+(WEATHER_NAME[fc]||'');
-  renderSellList();renderOrderList();renderToolList();
+  renderSellList();renderOrderList();renderToolList();renderRecipeList();
   setHutTab(hutTab);
   document.getElementById('hutModal').classList.add('show');
 }
@@ -271,3 +274,157 @@ document.getElementById('hutBtn').addEventListener('click',openHut);
 document.getElementById('sellAllBtn').addEventListener('click',sellAll);
 document.getElementById('discardTaintedBtn').addEventListener('click',discardTainted);
 document.querySelectorAll('#hutTabs button').forEach(b=>b.addEventListener('click',()=>setHutTab(b.dataset.tab)));
+
+/* ====================== P5 烹饪 buff（灶台） ====================== */
+/* buff 数值读取：普通 buff 存 {v,until}；灵芝老鸭汤单独存一档 state.buffs.all={speed,luck,reveal,until}，
+   与同名 buff 相乘叠加（仅 luck 类设 2.5 上限，其余不设上限，数值本身很小）。 */
+function buffV(key){return state.buffs[key]?state.buffs[key].v:1;}
+function effMul(key){
+  let v=buffV(key);
+  if(state.buffs.all&&state.buffs.all[key]!=null)v*=state.buffs.all[key];
+  if(key==='luck')v=Math.min(2.5,v);
+  return v;
+}
+/* P5：奶油蘑菇汤——背包临时 +5 格。所有判断/展示背包上限的地方都应改用 effCap() 而非 state.cap */
+function effCap(){return state.cap+(state.buffs.cap?state.buffs.cap.v:0);}
+/* 同名 buff 重做刷新 until、取较高的 v（5.2：「同类不叠加取高」） */
+function setBuff(key,v){
+  const until=state.day+1;
+  const cur=state.buffs[key];
+  state.buffs[key]={v:cur?Math.max(cur.v,v):v,until};
+}
+function setBuffAll(speed,luck,reveal){
+  const until=state.day+1;
+  const cur=state.buffs.all;
+  state.buffs.all={
+    speed:cur?Math.max(cur.speed,speed):speed,
+    luck:cur?Math.max(cur.luck,luck):luck,
+    reveal:cur?Math.max(cur.reveal,reveal):reveal,
+    until,
+  };
+}
+
+const RECIPES=[
+  {key:'speed',name:'小鸡炖蘑菇',ic:'🍲',effectTxt:'移速 +15%（至明日）',
+    options:[[{ids:['honey'],n:3}]],
+    apply(){setBuff('speed',1.15);}},
+  {key:'luck',name:'松茸炊饭',ic:'🍚',effectTxt:'稀有运 ×1.5（至明日）',
+    options:[[{ids:['matsu'],n:1}]],
+    apply(){setBuff('luck',1.5);}},
+  {key:'reveal',name:'黄油煎鸡油菌',ic:'🧈',effectTxt:'蘑菇显形微光半径 +40%（至明日）',
+    options:[[{ids:['chant'],n:3}]],
+    apply(){setBuff('reveal',1.4);}},
+  {key:'cap',name:'奶油蘑菇汤',ic:'🥣',effectTxt:'背包临时 +5 格（至明日）',
+    options:[[{ids:['button','field'],n:4}]],
+    apply(){setBuff('cap',5);}},
+  {key:'instInspect',name:'红菇炖汤',ic:'🍵',effectTxt:'观察无需蹲下等待，即时出卡（等效放大镜一天）',
+    options:[[{ids:['russula'],n:2}]],
+    apply(){setBuff('instInspect',1);}},
+  {key:'orderBonus',name:'椒盐马勃排',ic:'🍖',effectTxt:'委托报酬 +30%（至明日）',
+    options:[[{ids:['puff'],n:2}],[{ids:['gpuff'],n:1}]],
+    apply(){setBuff('orderBonus',1.3);}},
+  {key:'rainSpeed',name:'凉拌木耳',ic:'🥗',effectTxt:'雨天移速 +25%（至明日，与雨靴叠乘）',
+    options:[[{ids:['woodear'],n:3}]],
+    apply(){setBuff('rainSpeed',1.25);}},
+  {key:'lanmao',name:'干煸见手青',ic:'🌶️',effectTxt:'90%：稀有运 ×2；10%：见小人（附赠稀有运 ×1.2）',
+    silent:true,
+    options:[[{ids:['lanmao'],n:2}]],
+    apply(){
+      if(Math.random()<.9){
+        setBuff('luck',2.0);
+        toast('🍲 干煸见手青出锅了！这一锅炒透了，稀有运飙升~');
+      }else{
+        setBuff('luck',1.2);
+        toast('🍲 干煸见手青出锅了……总觉得没炒透？');
+        triggerXiaoren();
+      }
+    }},
+  {key:'all',name:'灵芝老鸭汤',ic:'🍜',effectTxt:'移速 +5%／稀有运 +10%／显形半径 +10%（至明日）',
+    options:[[{ids:['reishi'],n:1}]],
+    apply(){setBuffAll(1.05,1.1,1.1);}},
+  {key:'pity',name:'黑松露炖蛋',ic:'🍳',effectTxt:'明日保底刷出 1 株珍稀（★★★+）蘑菇',
+    options:[[{ids:['truffle'],n:1}]],
+    apply(){setBuff('pity',1);}},
+];
+const RECIPEMAP={};RECIPES.forEach(r=>RECIPEMAP[r.key]=r);
+
+/* 食材消耗：取背包中该物种（或组合池）fr 最高的 N 件，tainted 不可用，fr 需 >=0.5 */
+function eligibleItems(ids){
+  return state.inv.filter(it=>!it.tainted&&it.fr>=.5&&ids.includes(it.id));
+}
+function tryOption(option){
+  const chosen=[];
+  for(const req of option){
+    const pool=eligibleItems(req.ids).filter(it=>!chosen.includes(it));
+    if(pool.length<req.n)return null;
+    pool.sort((a,b)=>b.fr-a.fr);
+    chosen.push(...pool.slice(0,req.n));
+  }
+  return chosen;
+}
+function pickCookOption(recipe){
+  for(const opt of recipe.options){
+    const items=tryOption(opt);
+    if(items)return {opt,items};
+  }
+  return null;
+}
+function missingText(recipe){
+  let best=null;
+  for(const opt of recipe.options){
+    const parts=[];let deficit=0;
+    for(const req of opt){
+      const have=eligibleItems(req.ids).length;
+      const need=Math.max(0,req.n-have);
+      deficit+=need;
+      if(need>0)parts.push(req.ids.map(id=>SPMAP[id].n).join('/')+' 还差 '+need);
+    }
+    if(!best||deficit<best.deficit)best={deficit,parts};
+  }
+  return best&&best.deficit>0?best.parts.join('，'):'';
+}
+/* free=true（验收 cookFree 开关）时不消耗食材，直接做菜 */
+function cookRecipe(key,free){
+  const recipe=RECIPEMAP[key];if(!recipe)return false;
+  if(!free){
+    const sel=pickCookOption(recipe);
+    if(!sel){toast('🍲 食材还不够——'+missingText(recipe));return false;}
+    const ids=new Set(sel.items);
+    state.inv=state.inv.filter(it=>!ids.has(it));
+  }
+  recipe.apply();
+  if(!recipe.silent)toast('🍲 '+recipe.name+' 出锅了！'+recipe.effectTxt);
+  if(!state.cooked.includes(recipe.key))state.cooked.push(recipe.key);
+  updateHUD();checkAch();save();
+  renderRecipeList();renderSellList();
+  return true;
+}
+/* __mh cook(name)：按菜名或 key 做菜；window.cookFree=true 时不耗食材（测试用） */
+function cookByName(name){
+  const recipe=RECIPES.find(r=>r.name===name||r.key===name);
+  if(!recipe){toast('没有这道菜谱');return false;}
+  return cookRecipe(recipe.key,!!window.cookFree);
+}
+function renderRecipeList(){
+  const nEl=document.getElementById('recipeUnlockedN');
+  if(nEl)nEl.textContent=state.cooked.length;
+  const wrap=document.getElementById('recipeList');if(!wrap)return;
+  wrap.innerHTML='';
+  for(const r of RECIPES){
+    const done=state.cooked.includes(r.key);
+    const canCook=!!pickCookOption(r);
+    const missing=canCook?'':missingText(r);
+    const ingredientsHtml=r.options.map(opt=>opt.map(req=>
+      '<span class="ring-ing">'+req.ids.map(id=>'<img src="'+spriteURL(id)+'" alt="" title="'+SPMAP[id].n+'">').join('')+'×'+req.n+'</span>'
+    ).join('')).join('<span class="ring-or">或</span>');
+    const row=document.createElement('div');row.className='reciperow'+(done?' done':'');
+    row.innerHTML='<div class="ringhead"><span class="ric">'+r.ic+'</span>'+
+      '<div class="rinfo"><div class="rname">'+r.name+(done?' <span class="rdone">✓</span>':'')+'</div>'+
+      '<div class="ring">'+ingredientsHtml+'</div></div></div>'+
+      '<div class="reffect">'+r.effectTxt+'</div>'+
+      (missing?'<div class="rmissing">还缺：'+missing+'</div>':'')+
+      '<button class="cookbtn" data-key="'+r.key+'"'+(canCook?'':' disabled')+'>🔥 开火</button>';
+    wrap.appendChild(row);
+  }
+  wrap.querySelectorAll('.cookbtn').forEach(b=>b.addEventListener('click',()=>cookRecipe(b.dataset.key,false)));
+}

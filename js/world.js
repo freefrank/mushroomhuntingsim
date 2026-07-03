@@ -492,10 +492,20 @@ function dayCounterVal(s,key){
   return(s.flags[key]&&s.flags[key].day===s.day)?s.flags[key].n:0;
 }
 
+/* ====================== P5 烹饪 buff：过期结算 ====================== */
+/* 每道菜的 buff.until = 起做那天的 state.day+1（覆盖当天+明天）。
+   在「深入林间」推进天数之前，用**当前**（推进前）的 state.day 判定 until<=day 是否过期并清除——
+   这样 until=day+1 的 buff 在第一次推进（变成明天）时仍然有效，第二次推进（变成后天）时才被清掉。 */
+function clearExpiredBuffs(){
+  for(const k of Object.keys(state.buffs)){
+    const b=state.buffs[k];
+    if(b&&b.until<=state.day)delete state.buffs[k];
+  }
+}
 /* ---------- field generation ---------- */
 function newField(advanceDay){
   /* 只有「深入林间」触发的调用会推进天数（P1 0.2）；切换季节/环境时 advanceDay 为假，不加天 */
-  if(advanceDay){state.day++;decayInventory();}
+  if(advanceDay){clearExpiredBuffs();state.day++;decayInventory();}
   state.depth++;if(state.depth>state.maxDepth)state.maxDepth=state.depth;
   const seed=hash(state.biome+state.season+'#'+state.depth+'@'+Math.floor(Math.random()*1e9));
   const rg=mulberry32(seed);
@@ -556,7 +566,8 @@ function newField(advanceDay){
   /* ----- mushroom spawning (ecology-aware) ----- */
   const pool=SP.filter(s=>s.biome===state.biome&&s.seasons.includes(state.season));
   const raining=state.weather==='rain';
-  const luck=1+state.depth*.05, baseW=[100,46,16,6,2.2];
+  /* P5 5.2：「稀有运」类 buff（松茸炊饭/干煸见手青/灵芝老鸭汤的 all.luck）乘进稀有度权重 */
+  const luck=(1+state.depth*.05)*effMul('luck'), baseW=[100,46,16,6,2.2];
   function weighted(){
     if(!pool.length)return null;
     const ws=pool.map(s=>{
@@ -665,6 +676,11 @@ function newField(advanceDay){
       const sp=pick(rg,undisc);
       spawnCluster(sp);
     }
+  }
+  /* P5 5.2：黑松露炖蛋（pity buff）——明日保底刷出至少 1 株珍稀（r>=3）+ 物种 */
+  if(state.buffs.pity&&!mushrooms.some(m=>!m.trueId&&SPMAP[m.id]&&SPMAP[m.id].r>=3)){
+    const rarePool=pool.filter(s=>s.r>=3);
+    if(rarePool.length)spawnCluster(pick(rg,rarePool));
   }
   /* ----- P3 猎菇犬：本片林地随机认领 ≤2 个嗅探目标（优先埋藏菇，其次拟态菇） ----- */
   if(state.tools&&state.tools.dog){
