@@ -220,6 +220,23 @@
   .deliverbtn:active{transform:translateY(1px)}
   .deliverbtn:disabled{opacity:.4;cursor:not-allowed;filter:grayscale(.5)}
 
+  /* ---------- hut: 道具店 ---------- */
+  .toollist{display:flex;flex-direction:column;gap:8px}
+  .toolrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#fbf6e8;
+    border:1px solid #c9b183;border-radius:12px;padding:9px 12px}
+  .toolrow.owned{opacity:.82}
+  .toolic{font-size:26px;flex:none;width:32px;text-align:center}
+  .tinfo{flex:1;min-width:160px}
+  .tname{font-size:15px;color:#3d2f1a;font-weight:700}
+  .tdesc{font-size:12.5px;color:#8a7350;margin-top:2px;line-height:1.4}
+  .tnote{font-size:11.5px;color:#a04030;margin-top:2px}
+  .tprice{font-size:14px;color:#a97f2b;font-weight:700;white-space:nowrap}
+  .buybtn{font-family:inherit;font-size:13.5px;border:1px solid #8a6a20;
+    background:linear-gradient(180deg,#ecc46b,#cf9a33);color:#31230a;border-radius:9px;
+    padding:6px 14px;cursor:pointer;flex:none;font-weight:700}
+  .buybtn:active{transform:translateY(1px)}
+  .buybtn:disabled{opacity:.4;cursor:not-allowed;filter:grayscale(.5)}
+
   @media (max-width:420px){
     .act{font-size:13.5px;padding:10px 3px}
   }

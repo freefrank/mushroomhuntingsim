@@ -27,6 +27,7 @@ window.addEventListener('orientationchange',resizeView);
 if(window.ResizeObserver)new ResizeObserver(resizeView).observe(stageEl);
 resizeView();
 let decos=[],grassPatches=[],mushrooms=[],wparts=[],sparts=[],ripples=[],guideT=0,tnow=0,paused=true;
+let dogTargets=[]; // P3 猎菇犬：本片林地认领的嗅探目标（≤2 个）
 const player={x:WW/2,y:WH/2,dir:0,flip:false,moving:false,phase:0};
 let target=null,activeM=null,pendingPick=null;
 const keys={up:false,down:false,left:false,right:false};
@@ -453,7 +454,7 @@ function newField(advanceDay){
   setBgm(state.biome);
   bakeGround(rg,P);
 
-  decos=[];grassPatches=[];mushrooms=[];wparts=[];sparts=[];ripples=[];
+  decos=[];grassPatches=[];mushrooms=[];wparts=[];sparts=[];ripples=[];dogTargets=[];
   const isWinter=state.season===3;
   function mkT(){
     let kind=pick(rg,P.trees);
@@ -614,9 +615,25 @@ function newField(advanceDay){
       spawnCluster(sp);
     }
   }
+  /* ----- P3 猎菇犬：本片林地随机认领 ≤2 个嗅探目标（优先埋藏菇，其次拟态菇） ----- */
+  if(state.tools&&state.tools.dog){
+    const buriedPool=mushrooms.filter(m=>m.buried&&!m.picked);
+    const mimicPool=mushrooms.filter(m=>m.trueId&&!m.buried&&!m.picked);
+    const srcPool=(buriedPool.length?buriedPool:mimicPool).slice();
+    const chosen=[];
+    const n=Math.min(2,srcPool.length);
+    for(let i=0;i<n;i++)chosen.push(srcPool.splice(Math.floor(rg()*srcPool.length),1)[0]);
+    dogTargets=chosen;
+  }
+
   player.x=rint(rg,80,180);player.y=rint(rg,WH*.35,WH*.65);target=null;
   cam.x=Math.max(0,Math.min(WW-VW,player.x-VW/2));
   cam.y=Math.max(0,Math.min(WH-VH,player.y-VH/2));
+  /* 猎菇犬跟随玩家瞬移到新林地（防止跨场景丢狗） */
+  if(typeof dogState!=='undefined'&&dogState){
+    dogState.x=player.x-20;dogState.y=player.y+6;
+    dogState.mode='follow';dogState.target=null;dogState.moving=false;
+  }
   state.visited.add(state.biome);
   ensureOrders();
   if(typeof inspectState!=='undefined'&&inspectState)inspectState=null;

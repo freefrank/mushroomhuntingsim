@@ -100,3 +100,5 @@ function sfxDiscover(r){
   if(r>=4){for(let i=0;i<5;i++)tone(1568+i*180,0.5+i*0.05,0.32,'sine',0.045);}
 }
 function sfxAch(){tone(523,0,0.1,'triangle',0.09);tone(659,0.09,0.1,'triangle',0.09);tone(784,0.18,0.22,'triangle',0.1);}
+/* ====================== P3 猎菇犬：两声短促方波吠声 ====================== */
+function sfxBark(){tone(250,0,0.09,'square',0.09);tone(230,0.13,0.09,'square',0.08);}

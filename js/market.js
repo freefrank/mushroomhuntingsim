@@ -178,18 +178,67 @@ function deliver(i){
   renderSellList();renderOrderList();
 }
 
+/* ====================== P3 道具店 ====================== */
+const TOOLS=[
+  {id:'dog',ic:'🐕',n:'猎菇犬',price:400,desc:'跟随身后；能嗅出埋藏的菇与拟态菇的蛛丝马迹'},
+  {id:'boots',ic:'🥾',n:'雨靴',price:120,desc:'雨天与湿地里，脚步轻快了两成半'},
+  {id:'shovel',ic:'⛏',n:'小铲',price:150,desc:'埋藏的土堆隔老远就能瞧出苗头，还带着一层淡金微光'},
+  {id:'lens',ic:'🔍',n:'放大镜',price:250,desc:'观察蘑菇无需蹲下等待，即刻看清底细'},
+  {id:'lantern',ic:'🏮',n:'灯笼',price:200,desc:'照亮灵境秘林的幽暗，画面更亮、暗角更浅'},
+  {id:'basket1',ic:'🧺',n:'大竹篮 I',price:180,desc:'背包容量 25 → 40'},
+  {id:'basket2',ic:'🧺',n:'大竹篮 II',price:420,desc:'背包容量 40 → 60（需先备好大竹篮 I）'},
+];
+const TOOLMAP={};TOOLS.forEach(t=>TOOLMAP[t.id]=t);
+function applyToolEffect(id){
+  if(id==='basket1')state.cap=Math.max(state.cap,40);
+  if(id==='basket2')state.cap=Math.max(state.cap,60);
+}
+function buyTool(id,free){
+  const t=TOOLMAP[id];if(!t)return;
+  if(state.tools[id]){toast('这件道具已经备下了');return;}
+  if(id==='basket2'&&!state.tools.basket1){toast('先备好大竹篮 I 吧');return;}
+  if(!free){
+    if(state.coins<t.price){toast('🪙 金币不够，先去卖些蘑菇吧');return;}
+    state.coins-=t.price;
+  }
+  state.tools[id]=true;
+  applyToolEffect(id);
+  toast(t.ic+' 备下了「'+t.n+'」'+(free?'':'，花费 '+t.price+' 🪙'));
+  updateHUD();checkAch();save();
+  renderToolList();
+}
+function renderToolList(){
+  const wrap=document.getElementById('toolList');if(!wrap)return;
+  wrap.innerHTML='';
+  for(const t of TOOLS){
+    const owned=!!state.tools[t.id];
+    const lockedBasket2=t.id==='basket2'&&!state.tools.basket1;
+    const afford=state.coins>=t.price;
+    const disabled=owned||lockedBasket2||!afford;
+    const row=document.createElement('div');row.className='toolrow'+(owned?' owned':'');
+    row.innerHTML='<span class="toolic">'+t.ic+'</span>'+
+      '<div class="tinfo"><div class="tname">'+t.n+'</div><div class="tdesc">'+t.desc+'</div>'+
+      (lockedBasket2?'<div class="tnote">需先购买大竹篮 I</div>':'')+'</div>'+
+      '<div class="tprice">'+t.price+' 🪙</div>'+
+      '<button class="buybtn" data-id="'+t.id+'"'+(disabled?' disabled':'')+'>'+(owned?'✓ 已备下':'买下')+'</button>';
+    wrap.appendChild(row);
+  }
+  wrap.querySelectorAll('.buybtn').forEach(b=>b.addEventListener('click',()=>buyTool(b.dataset.id,false)));
+}
+
 /* ---------- 小屋弹窗 ---------- */
 let hutTab='sell';
 function setHutTab(tab){
   hutTab=tab;
-  const sellPane=document.getElementById('hutSell'),ordPane=document.getElementById('hutOrders');
+  const sellPane=document.getElementById('hutSell'),ordPane=document.getElementById('hutOrders'),toolPane=document.getElementById('hutTools');
   if(sellPane)sellPane.style.display=tab==='sell'?'block':'none';
   if(ordPane)ordPane.style.display=tab==='orders'?'block':'none';
+  if(toolPane)toolPane.style.display=tab==='tools'?'block':'none';
   document.querySelectorAll('#hutTabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===tab));
 }
 function openHut(){
   ensureOrders();
-  renderSellList();renderOrderList();
+  renderSellList();renderOrderList();renderToolList();
   setHutTab(hutTab);
   document.getElementById('hutModal').classList.add('show');
 }

@@ -110,3 +110,144 @@ function makePlayer(dir,frame){
 }
 const PLAYER=[];
 for(let d=0;d<3;d++){PLAYER[d]=[];for(let f=0;f<3;f++)PLAYER[d][f]=makePlayer(d,f);}
+
+/* ====================== P3 猎菇犬 sprite ====================== */
+/* dir: 0=down 1=up 2=side(基准朝右，render.js 用 flip 翻到左) ; frame: 0/1 两帧走姿 */
+const DOG_W=36,DOG_H=42; // 展示尺寸，约玩家(46x68)高度的 0.6 倍
+function makeDog(dir,frame){
+  const S=2,W=DOG_W*S,H=DOG_H*S;
+  const cn=mkCanvas(W,H),c=cn.getContext('2d');
+  c.lineJoin='round';c.lineCap='round';
+  const cx=W/2,baseY=H-2*S;
+  const cream='#f0dcb0',creamHi='#faeecb',creamSh='#d7bb86';
+  const brown='#9a6a3a',brownSh='#764c26';
+  const pawC='#e8d0a4',nose='#33241a',eyeC='#221609';
+  const collar='#c0392b',buckle='#e8c34a';
+  const out='rgba(28,19,10,.45)';
+  function rr(x,y,w2,h2,r){
+    c.beginPath();
+    c.moveTo(x+r,y);c.arcTo(x+w2,y,x+w2,y+h2,r);c.arcTo(x+w2,y+h2,x,y+h2,r);
+    c.arcTo(x,y+h2,x,y,r);c.arcTo(x,y,x+w2,y,r);c.closePath();
+  }
+  const step=frame===0?0:1;
+
+  if(dir===2){ /* ---- 侧面轮廓，基准朝右 ---- */
+    const legTopY=baseY-11*S,legLen=9*S;
+    const off1=step?2.4*S:-1.6*S,off2=step?-1.6*S:2.4*S;
+    c.strokeStyle=brownSh;c.lineWidth=2.6*S;
+    c.beginPath();c.moveTo(cx-6*S,legTopY);c.lineTo(cx-6*S+off1*.4,legTopY+legLen);c.stroke();
+    c.beginPath();c.moveTo(cx+6*S,legTopY);c.lineTo(cx+6*S+off2*.4,legTopY+legLen);c.stroke();
+    c.fillStyle=pawC;
+    c.beginPath();c.ellipse(cx-6*S+off1*.4,legTopY+legLen,2*S,1.4*S,0,0,7);c.fill();
+    c.beginPath();c.ellipse(cx+6*S+off2*.4,legTopY+legLen,2*S,1.4*S,0,0,7);c.fill();
+    // 卷尾（身后，即朝左一侧）
+    c.strokeStyle=brown;c.lineWidth=2.6*S;
+    c.beginPath();
+    c.moveTo(cx-9.5*S,baseY-16*S);
+    c.quadraticCurveTo(cx-15*S,baseY-19*S,cx-12.5*S,baseY-24*S);
+    c.quadraticCurveTo(cx-10*S,baseY-27*S,cx-8*S,baseY-22.5*S);
+    c.stroke();
+    // 躯干
+    const tg=c.createLinearGradient(cx,baseY-22*S,cx,baseY-9*S);
+    tg.addColorStop(0,creamHi);tg.addColorStop(1,creamSh);
+    c.fillStyle=tg;
+    c.beginPath();c.ellipse(cx-.5*S,baseY-15*S,10.5*S,7.4*S,0,0,7);c.fill();
+    c.strokeStyle=out;c.lineWidth=S*.7;c.stroke();
+    // 背斑
+    c.fillStyle=rgba(brown,.88);
+    c.beginPath();c.ellipse(cx-2*S,baseY-19*S,6*S,3.6*S,-.12,0,7);c.fill();
+    // 头（朝右）
+    const hx=cx+9*S,hy=baseY-19*S;
+    const hg=c.createRadialGradient(hx-1*S,hy-1*S,S,hx,hy,6*S);
+    hg.addColorStop(0,creamHi);hg.addColorStop(1,creamSh);
+    c.fillStyle=hg;c.beginPath();c.arc(hx,hy,5.6*S,0,7);c.fill();
+    c.strokeStyle=out;c.lineWidth=S*.7;c.stroke();
+    // 竖耳
+    c.fillStyle=brown;
+    c.beginPath();c.moveTo(hx+.5*S,hy-4.5*S);c.lineTo(hx+4.5*S,hy-9*S);c.lineTo(hx+3*S,hy-2.5*S);c.closePath();c.fill();
+    c.strokeStyle=out;c.lineWidth=S*.6;c.stroke();
+    c.fillStyle='#e0b98a';
+    c.beginPath();c.moveTo(hx+1.4*S,hy-4.6*S);c.lineTo(hx+3.6*S,hy-7.4*S);c.lineTo(hx+2.8*S,hy-3.4*S);c.closePath();c.fill();
+    // 口鼻
+    c.fillStyle=creamHi;
+    c.beginPath();c.ellipse(hx+5*S,hy+1.4*S,3*S,2.2*S,0,0,7);c.fill();
+    c.strokeStyle=out;c.lineWidth=S*.55;c.stroke();
+    c.fillStyle=nose;c.beginPath();c.ellipse(hx+7*S,hy+.6*S,1.1*S,.9*S,0,0,7);c.fill();
+    // 眼
+    c.fillStyle=eyeC;c.beginPath();c.arc(hx+3*S,hy-.6*S,.9*S,0,7);c.fill();
+    // 红项圈
+    c.strokeStyle=collar;c.lineWidth=2.2*S;
+    c.beginPath();c.arc(hx,hy+3.6*S,4.6*S,.15,Math.PI-.15);c.stroke();
+    c.fillStyle=buckle;c.beginPath();c.arc(hx,hy+7.2*S,1*S,0,7);c.fill();
+  }else{ /* ---- 0=正面向下 / 1=背面向上 ---- */
+    const facingDown=dir===0;
+    const legOff=step?[1.4*S,-1.4*S]:[-1.4*S,1.4*S];
+    const legW=3*S,legGap=4.5*S;
+    const legXs=[cx-legGap-legW/2,cx+legGap-legW/2];
+    c.fillStyle=brownSh;
+    for(let i=0;i<2;i++){rr(legXs[i],baseY-9*S+legOff[i],legW,7*S,1.4*S);c.fill();}
+    c.fillStyle=pawC;
+    for(let i=0;i<2;i++){
+      c.beginPath();c.ellipse(legXs[i]+legW/2,baseY-1.5*S+legOff[i],2*S,1.4*S,0,0,7);c.fill();
+    }
+    // 卷尾
+    c.strokeStyle=brown;c.lineWidth=2.6*S;
+    c.beginPath();
+    if(facingDown){
+      c.moveTo(cx+7*S,baseY-15*S);
+      c.quadraticCurveTo(cx+12*S,baseY-19*S,cx+9*S,baseY-24*S);
+      c.quadraticCurveTo(cx+6.5*S,baseY-27*S,cx+5*S,baseY-22*S);
+    }else{
+      c.moveTo(cx,baseY-19*S);
+      c.quadraticCurveTo(cx+5*S,baseY-25*S,cx,baseY-29*S);
+      c.quadraticCurveTo(cx-5*S,baseY-25*S,cx-1*S,baseY-19*S);
+    }
+    c.stroke();
+    // 躯干
+    const tg=c.createLinearGradient(cx-9*S,0,cx+9*S,0);
+    tg.addColorStop(0,creamHi);tg.addColorStop(.55,cream);tg.addColorStop(1,creamSh);
+    c.fillStyle=tg;
+    c.beginPath();c.ellipse(cx,baseY-14*S,8.6*S,8*S,0,0,7);c.fill();
+    c.strokeStyle=out;c.lineWidth=S*.75;c.stroke();
+    // 背斑
+    c.fillStyle=rgba(brown,.85);
+    c.beginPath();c.ellipse(cx,baseY-19*S,7*S,4*S,0,0,7);c.fill();
+    // 头
+    const hy=baseY-24*S;
+    const hg=c.createRadialGradient(cx-1.5*S,hy-1.5*S,S,cx,hy,6.6*S);
+    hg.addColorStop(0,creamHi);hg.addColorStop(1,creamSh);
+    c.fillStyle=hg;c.beginPath();c.arc(cx,hy,6.2*S,0,7);c.fill();
+    c.strokeStyle=out;c.lineWidth=S*.75;c.stroke();
+    // 竖耳
+    c.fillStyle=brown;
+    c.beginPath();c.moveTo(cx-5.4*S,hy-2*S);c.lineTo(cx-6.6*S,hy-8*S);c.lineTo(cx-1.6*S,hy-3.6*S);c.closePath();c.fill();
+    c.beginPath();c.moveTo(cx+5.4*S,hy-2*S);c.lineTo(cx+6.6*S,hy-8*S);c.lineTo(cx+1.6*S,hy-3.6*S);c.closePath();c.fill();
+    c.strokeStyle=out;c.lineWidth=S*.6;c.stroke();
+    if(facingDown){
+      c.fillStyle='#e0b98a';
+      c.beginPath();c.moveTo(cx-4.8*S,hy-3*S);c.lineTo(cx-5.6*S,hy-6.6*S);c.lineTo(cx-2.6*S,hy-4*S);c.closePath();c.fill();
+      c.beginPath();c.moveTo(cx+4.8*S,hy-3*S);c.lineTo(cx+5.6*S,hy-6.6*S);c.lineTo(cx+2.6*S,hy-4*S);c.closePath();c.fill();
+      // 口鼻
+      c.fillStyle=creamHi;
+      c.beginPath();c.ellipse(cx,hy+3.4*S,3.4*S,2.6*S,0,0,7);c.fill();
+      c.strokeStyle=out;c.lineWidth=S*.55;c.stroke();
+      c.fillStyle=nose;c.beginPath();c.ellipse(cx,hy+2.6*S,1.2*S,.9*S,0,0,7);c.fill();
+      // 眼
+      c.fillStyle=eyeC;
+      c.beginPath();c.arc(cx-2.6*S,hy-.4*S,.95*S,0,7);c.fill();
+      c.beginPath();c.arc(cx+2.6*S,hy-.4*S,.95*S,0,7);c.fill();
+      // 红项圈
+      c.strokeStyle=collar;c.lineWidth=2.4*S;
+      c.beginPath();c.arc(cx,hy+6*S,5*S,Math.PI*.15,Math.PI*.85);c.stroke();
+      c.fillStyle=buckle;c.beginPath();c.arc(cx,hy+7.4*S,1*S,0,7);c.fill();
+    }else{
+      // 背面：项圈只在颈侧露出一小截
+      c.strokeStyle=collar;c.lineWidth=2*S;
+      c.beginPath();c.moveTo(cx-5*S,hy+3.6*S);c.lineTo(cx-3.4*S,hy+4.6*S);c.stroke();
+      c.beginPath();c.moveTo(cx+5*S,hy+3.6*S);c.lineTo(cx+3.4*S,hy+4.6*S);c.stroke();
+    }
+  }
+  return cn;
+}
+const DOG=[];
+for(let d=0;d<3;d++){DOG[d]=[];for(let f=0;f<2;f++)DOG[d][f]=makeDog(d,f);}

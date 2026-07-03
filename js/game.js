@@ -68,6 +68,7 @@ function closeInspectCard(){
 function startInspect(m){
   if(!m||paused||inspectState||inspectCardOpen||m.picked)return;
   target=null;pendingPick=null;
+  if(state.tools.lens){finishInspect(m);return;} /* P3 放大镜：观察无需蹲下等待，即时出卡 */
   inspectState={m,timer:600};
 }
 
@@ -86,6 +87,7 @@ function doPick(){
   const realId=isMimic?m.trueId:m.id;
   const sp=SPMAP[realId];
   m.picked=true;state.picks++;
+  if(m.dogMarked&&m.buried)state.flags.dogNose=true; /* P3 成就：鼻子比眼灵 */
   state.inv.push({id:realId,q:1,fr:1,var:null,day:state.day,tainted:false});
   state.count[realId]=(state.count[realId]||0)+1;
   if(state.weather==='rain')state.flags.rain=true;
@@ -192,6 +194,9 @@ const ACH=[
   {id:'mimic1',ic:'👁️',t:'火眼金睛',d:'第一次识破拟态并成功采下',f:s=>(s.stats.mimicCaught||0)>=1},
   {id:'mimicfooled',ic:'🩹',t:'学费',d:'第一次被相似种坑了一把',f:s=>(s.stats.mimicFooled||0)>=1},
   {id:'mimic10',ic:'🕵️',t:'鉴菇师',d:'累计识破拟态 10 次',f:s=>(s.stats.mimicCaught||0)>=10},
+  {id:'dog1',ic:'🐕',t:'最好的朋友',d:'购入猎菇犬',f:s=>!!s.tools.dog},
+  {id:'dognose',ic:'👃',t:'鼻子比眼灵',d:'采到猎菇犬提示过的埋藏蘑菇',f:s=>!!s.flags.dogNose},
+  {id:'toolsall',ic:'🎒',t:'装备齐全',d:'集齐全部工具',f:s=>['dog','boots','shovel','lens','lantern','basket1','basket2'].every(k=>s.tools[k])},
 ];
 function checkAch(){
   for(const a of ACH){
@@ -337,7 +342,7 @@ function openAch(){
 document.getElementById('resetBtn').onclick=()=>{
   state.disc.clear();state.ach.clear();state.picks=0;state.count={};
   state.maxDepth=0;state.depth=0;
-  state.flags={rain:false,wood:0,ring:false,winterDisc:0};state.visited.clear();
+  state.flags={rain:false,wood:0,ring:false,winterDisc:0,dogNose:false};state.visited.clear();
   state.coins=0;state.inv=[];state.cap=25;state.day=1;state.orders=[];
   state.tools={};state.buffs={};state.cooked=[];
   state.stats={sold:0,earned:0,ordersDone:0,mimicCaught:0,mimicFooled:0};
@@ -456,4 +461,9 @@ window.__mh={
     updateHUD();save();
     return data;
   },
+  /* P3 猎菇犬 + 工具店 验收钩子 */
+  buy:id=>buyTool(id,true),
+  dog:()=>dogState,
+  toolOwned:id=>!!state.tools[id],
+  dogTargets:()=>dogTargets,
 };

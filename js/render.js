@@ -45,6 +45,11 @@ function drawMush(m){
 }
 function drawMound(m){
   const x=m.x,y=m.y;
+  if(state.tools.shovel){ /* P3 小铲：土堆加淡金微光 */
+    const gg=ctx.createRadialGradient(x,y-4,2,x,y-4,22);
+    gg.addColorStop(0,'rgba(255,224,140,.32)');gg.addColorStop(1,'rgba(255,224,140,0)');
+    ctx.fillStyle=gg;ctx.beginPath();ctx.arc(x,y-4,22,0,7);ctx.fill();
+  }
   ctx.fillStyle='rgba(16,12,6,.2)';
   ctx.beginPath();ctx.ellipse(x,y+1,10,3,0,0,7);ctx.fill();
   const g=ctx.createRadialGradient(x-2,y-5,1,x,y-3,10);
@@ -89,6 +94,120 @@ function drawPlayer(crouch){
   if(crouch){ctx.translate(0,5);ctx.scale(1,.86);} /* 观察时的蹲姿：复用站立帧做挤压变形 */
   ctx.drawImage(spr,-23,-64,46,68);
   ctx.restore();
+}
+
+/* ====================== P3 猎菇犬 ====================== */
+let dogState={x:0,y:0,dir:0,flip:false,phase:0,moving:false,mode:'follow',target:null,sitPhase:0,spin:0,_phase:'go',sniffMs:0};
+let dogIdleT=0;
+function updateDog(){
+  if(!state.tools.dog)return;
+  const p=player;
+  /* 认领目标：玩家进入 300px 内且该目标未提示过时，狗切到嗅探模式 */
+  if(dogState.mode!=='sniff'){
+    for(const m of dogTargets){
+      if(m.picked||m.dogNotified)continue;
+      if(Math.hypot(m.x-p.x,m.y-p.y)<300){
+        dogState.mode='sniff';dogState.target=m;dogState._phase='go';break;
+      }
+    }
+  }
+  if(dogState.mode==='sniff'){
+    const m=dogState.target;
+    if(!m||m.picked){dogState.mode='follow';dogState.target=null;dogIdleT=0;return;}
+    const dx=m.x-dogState.x,dy=m.y-dogState.y,d=Math.hypot(dx,dy)||.01;
+    if(dogState._phase==='go'){
+      if(d>10){
+        const spdDog=2.9*1.4;
+        dogState.x+=dx/d*spdDog*dtf;dogState.y+=dy/d*spdDog*dtf;
+        dogState.moving=true;dogState.phase+=.32*dtf;
+        if(Math.abs(dx)>Math.abs(dy)*1.2){dogState.dir=2;dogState.flip=dx<0;}
+        else if(dy<0)dogState.dir=1;else dogState.dir=0;
+      }else{
+        dogState.moving=false;dogState._phase='alert';dogState.sniffMs=3000;dogState.spin=0;
+        if(!m.dogNotified){
+          m.dogNotified=true;m.dogMarked=true; /* P3 6. 鼻子比眼灵 成就判定标记 */
+          sfxBark();
+          toast(m.buried?'🐕 小狗在一处土堆前打转——底下有东西！':'🐕 小狗对着那朵菇低吼——不太对劲');
+        }
+      }
+    }else{
+      dogState.spin+=.15*dtf;
+      dogState.sniffMs-=16.7*dtf;
+      if(dogState.sniffMs<=0){dogState.mode='follow';dogState.target=null;}
+    }
+    return;
+  }
+  /* 跟随：目标点=玩家身后 46px（按玩家朝向反方向），正面/背面朝向时额外加一点侧向偏移，
+     避免狗正好叠在角色头顶、挡住视线 */
+  let fx=0,fy=1;
+  if(p.dir===1){fx=0;fy=-1;}else if(p.dir===2){fx=p.flip?-1:1;fy=0;}
+  const lateral=p.dir===2?0:18;
+  const tx=p.x-fx*46+lateral,ty=p.y-fy*46;
+  const dist=Math.hypot(tx-dogState.x,ty-dogState.y);
+  const px0=dogState.x,py0=dogState.y;
+  if(dist>240){dogState.x=tx;dogState.y=ty;} /* 距离过远（跨场景）直接瞬移，防止丢狗 */
+  else{
+    const lerp=1-Math.pow(.92,dtf);
+    dogState.x+=(tx-dogState.x)*lerp;dogState.y+=(ty-dogState.y)*lerp;
+  }
+  const mdx=dogState.x-px0,mdy=dogState.y-py0,mdist=Math.hypot(mdx,mdy);
+  if(!p.moving&&dist<20)dogIdleT+=16.7*dtf;else dogIdleT=0;
+  if(dogIdleT>4000){ /* 玩家静止 4s → 坐姿摇尾 */
+    dogState.mode='sit';dogState.moving=false;
+    dogState.dir=p.dir;dogState.flip=p.flip;
+    dogState.sitPhase+=.06*dtf;
+  }else{
+    dogState.mode='follow';
+    dogState.moving=mdist>.05;
+    if(dogState.moving){
+      dogState.phase+=.3*dtf;
+      if(Math.abs(mdx)>Math.abs(mdy)*1.2){dogState.dir=2;dogState.flip=mdx<0;}
+      else if(mdy<0)dogState.dir=1;else if(mdy>0)dogState.dir=0;
+    }
+  }
+}
+function drawDog(){
+  if(!state.tools.dog)return;
+  const d=dogState;
+  ctx.fillStyle='rgba(16,12,6,.25)';
+  ctx.beginPath();ctx.ellipse(d.x,d.y+1,8,3,0,0,7);ctx.fill();
+  const sniffing=d.mode==='sniff'&&d._phase==='alert';
+  if(sniffing&&d.target){ /* 淡金色扩散嗅探圈，随时间消隐 */
+    const m=d.target,prog=1-Math.max(0,d.sniffMs)/3000;
+    const rad=10+prog*46,alpha=(1-prog)*.5;
+    const g=ctx.createRadialGradient(m.x,m.y,2,m.x,m.y,rad);
+    g.addColorStop(0,'rgba(255,224,140,'+alpha+')');g.addColorStop(1,'rgba(255,224,140,0)');
+    ctx.fillStyle=g;ctx.beginPath();ctx.arc(m.x,m.y,rad,0,7);ctx.fill();
+  }
+  ctx.save();
+  ctx.translate(Math.round(d.x),Math.round(d.y));
+  if(sniffing)ctx.rotate(d.spin);
+  const sit=d.mode==='sit';
+  let spr;
+  if(sit)spr=DOG[0][0];
+  else{const fr=d.moving?(Math.sin(d.phase)>0?0:1):0;spr=DOG[d.dir][fr];}
+  if(!sit&&d.flip&&d.dir===2)ctx.scale(-1,1);
+  if(sit){ctx.translate(0,4);ctx.scale(1,.9);}
+  ctx.drawImage(spr,-DOG_W/2,-DOG_H,DOG_W,DOG_H);
+  ctx.restore();
+  if(sit){ /* 简化摇尾：坐姿时在身侧画一道摆动的小弧线代表尾巴摇摆，探出轮廓外便于辨认 */
+    const wag=Math.sin(tnow/220)*6;
+    ctx.strokeStyle='#c9924f';ctx.lineWidth=3;ctx.lineCap='round';
+    ctx.beginPath();
+    ctx.moveTo(d.x+10,d.y-9);
+    ctx.quadraticCurveTo(d.x+19+wag*.4,d.y-16,d.x+15+wag,d.y-24);
+    ctx.stroke();
+  }
+  if(sniffing){ /* 头顶 ❗ 徽记 */
+    const bx=d.x,by=d.y-DOG_H-6;
+    ctx.save();
+    ctx.beginPath();ctx.arc(bx,by,7.5,0,7);
+    ctx.fillStyle='#f7ecd2';ctx.fill();
+    ctx.strokeStyle='rgba(180,40,20,.6)';ctx.lineWidth=1.4;ctx.stroke();
+    ctx.font='bold 11px "Noto Serif SC",serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillStyle='#b0281a';ctx.fillText('❗',bx,by+.5);
+    ctx.restore();
+  }
 }
 
 /* weather + particles */
@@ -177,7 +296,9 @@ function seasonTint(){
     ctx.fillStyle='rgba(190,198,205,.1)';ctx.fillRect(0,0,VW,VH);
   }
   if(b==='grove'){
-    ctx.fillStyle='rgba(24,14,48,.22)';ctx.fillRect(0,0,VW,VH);
+    const lit=!!state.tools.lantern; /* P3 灯笼：灵境画面提亮 */
+    ctx.fillStyle='rgba(24,14,48,'+(lit?.11:.22)+')';ctx.fillRect(0,0,VW,VH);
+    if(lit){ctx.fillStyle='rgba(255,224,150,.07)';ctx.fillRect(0,0,VW,VH);}
   }
 }
 function stepSparts(){
@@ -243,7 +364,9 @@ function loop(t){
       if(im&&!im.picked)finishInspect(im);
     }
   }
-  const p=player;let vx=0,vy=0;const spd=2.9;
+  const p=player;let vx=0,vy=0;
+  let spd=2.9;
+  if(state.tools.boots&&(state.weather==='rain'||state.biome==='wetland'))spd*=1.25; /* P3 雨靴 */
   if(!inspectState&&!inspectCardOpen){
     if(keys.left)vx-=1;if(keys.right)vx+=1;if(keys.up)vy-=1;if(keys.down)vy+=1;
     if(vx||vy){target=null;pendingPick=null;}
@@ -264,11 +387,13 @@ function loop(t){
   const clerp=1-Math.pow(.9,dtf);
   cam.x+=(tx-cam.x)*clerp;cam.y+=(ty-cam.y)*clerp;
 
+  updateDog();
+
   activeM=null;let bestD=1e9;
   for(const m of mushrooms){
     if(m.picked)continue;
     if(!m.revealed){
-      const rr2=m.buried?30:m.inGrass?30:44;
+      const rr2=m.buried?(state.tools.shovel?60:30):m.inGrass?30:44; /* P3 小铲：埋藏土堆可视距离翻倍 */
       if(Math.hypot(m.x-p.x,m.y-p.y)<rr2){
         m.revealed=true;sfxReveal();if(m.inGrass)rustle();
         puff(m.x,m.y,'#efe6cf',8);
@@ -294,12 +419,14 @@ function loop(t){
   ctx.drawImage(ground,cam.x,cam.y,VW,VH,0,0,VW,VH);
   ctx.save();ctx.translate(-Math.round(cam.x),-Math.round(cam.y));
   const ents=[{y:p.y,k:'p'}];
+  if(state.tools.dog)ents.push({y:dogState.y,k:'dog'});
   for(const d of decos)if(d.x>cam.x-90&&d.x<cam.x+VW+90&&d.y>cam.y-40&&d.y<cam.y+VH+150)ents.push({y:d.y,k:'d',d});
   for(const g of grassPatches)if(g.x>cam.x-60&&g.x<cam.x+VW+60&&g.y>cam.y-50&&g.y<cam.y+VH+50)ents.push({y:g.y,k:'g',g});
   for(const m of mushrooms)if(!m.picked&&m.x>cam.x-50&&m.x<cam.x+VW+50&&m.y>cam.y-50&&m.y<cam.y+VH+50)ents.push({y:m.y,k:'m',m});
   ents.sort((a,b)=>a.y-b.y);
   for(const e of ents){
     if(e.k==='p')drawPlayer(!!inspectState);
+    else if(e.k==='dog')drawDog();
     else if(e.k==='d')ctx.drawImage(e.d.s.cn,Math.round(e.d.x-e.d.s.ox),Math.round(e.d.y-e.d.s.oy));
     else if(e.k==='g')drawGrassPatch(e.g);
     else{const m=e.m;if(!m.revealed){if(m.buried)drawMound(m);}else drawMush(m);}
@@ -309,7 +436,9 @@ function loop(t){
   drawRays();
   stepWeather();
   seasonTint();
-  ctx.drawImage(VIG,0,0,VW,VH);
+  if(state.biome==='grove'&&state.tools.lantern){ /* P3 灯笼：暗角减弱 */
+    ctx.globalAlpha=.5;ctx.drawImage(VIG,0,0,VW,VH);ctx.globalAlpha=1;
+  }else ctx.drawImage(VIG,0,0,VW,VH);
   positionPrompt();
 }
 const VIG=(function(){
