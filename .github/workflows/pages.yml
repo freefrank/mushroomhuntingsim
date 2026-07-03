@@ -24,6 +24,6 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout --orphan gh-pages-tmp
           git rm -rf --cached . -q
-          git add index.html README.md css js
+          git add index.html README.md css js assets
           git commit -m "deploy: ${GITHUB_SHA::7}"
           git push -f origin gh-pages-tmp:gh-pages
