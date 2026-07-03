@@ -66,16 +66,26 @@ function ensureOrders(){
 }
 
 /* ---------- 出售页签 ---------- */
+/* P4：分堆键——tainted（污染）与「已自融」（fr=0 的鬼伞类）各自单独成堆，其余按物种聚合 */
+function stackKey(it){
+  if(it.tainted)return it.id+'#t';
+  if((it.id==='inky'||it.id==='shaggy')&&it.fr<=0)return it.id+'#m';
+  return it.id;
+}
 function stackInv(){
   const map={};
   for(const it of state.inv){
-    const key=it.id+(it.tainted?'#t':'');
+    const key=stackKey(it);
     (map[key]=map[key]||[]).push(it);
   }
   return map;
 }
-/* tainted（被拟态污染）物品售价恒为 0，P2 2.4 */
-function itemPrice(it){return it.tainted?0:priceOf(it.id,it.q,it.fr);}
+/* tainted（被拟态污染）物品售价恒为 0（P2 2.4）；已自融的鬼伞单价固定 1（P4 4.2） */
+function itemPrice(it){
+  if(it.tainted)return 0;
+  if((it.id==='inky'||it.id==='shaggy')&&it.fr<=0)return 1;
+  return priceOf(it.id,it.q,it.fr);
+}
 function renderSellList(){
   const capEl=document.getElementById('hutCapN'),invEl=document.getElementById('hutInvN');
   if(invEl)invEl.textContent=state.inv.length;
@@ -94,30 +104,40 @@ function renderSellList(){
     return SPMAP[idB].r-SPMAP[idA].r;
   });
   for(const key of keys){
-    const tainted=key.endsWith('#t');
-    const id=tainted?key.slice(0,-2):key;
+    const tainted=key.endsWith('#t'),melted=key.endsWith('#m');
+    const id=key.split('#')[0];
     const sp=SPMAP[id],items=map[key],n=items.length;
-    const unit=tainted?0:priceOf(id),total=unit*n;
+    /* 堆内逐件按各自 fr 计价再加总，行内单价显示为均价 */
+    const total=items.reduce((s,it)=>s+itemPrice(it),0);
+    const unit=Math.round(total/n);
+    const avgFr=items.reduce((s,it)=>s+it.fr,0)/n;
     const pf=priceFactor(id);
-    const arrow=(!tainted&&pf>=1.15)?'<span class="pf up">↑</span>':(!tainted&&pf<=.9)?'<span class="pf down">↓</span>':'';
+    const arrow=(!tainted&&!melted&&pf>=1.15)?'<span class="pf up">↑</span>':(!tainted&&!melted&&pf<=.9)?'<span class="pf down">↓</span>':'';
     const pharm=(!tainted&&(sp.edi==='poison'||sp.edi==='deadly'))?' <span class="pharm">⚗ 药铺收购</span>':'';
     const taintedTag=tainted?' <span class="taintedtag">已污染</span>':'';
+    const meltedTag=melted?'（已自融 🖤）':'';
+    const frCls=avgFr>=.7?'fr-green':avgFr>=.4?'fr-yellow':'fr-gray';
+    const frBar=tainted?'':'<span class="frtrack" title="新鲜度约 '+Math.round(avgFr*100)+'%"><i class="fri '+frCls+'" style="width:'+Math.round(avgFr*100)+'%"></i></span>';
     const row=document.createElement('div');row.className='sellrow'+(tainted?' tainted':'');
     row.innerHTML='<img src="'+spriteURL(id)+'" alt="">'+
-      '<div class="sinfo"><div class="sname">'+sp.n+arrow+pharm+taintedTag+'</div>'+
-      '<div class="sunit">单价 '+unit+' 🪙 × '+n+'</div></div>'+
+      '<div class="sinfo"><div class="sname">'+sp.n+meltedTag+arrow+pharm+taintedTag+'</div>'+
+      '<div class="sunit">单价约 '+unit+' 🪙 × '+n+frBar+'</div></div>'+
       '<div class="stotal">'+total+' 🪙</div>'+
-      '<button class="sellbtn" data-id="'+id+'" data-tainted="'+(tainted?'1':'0')+'">'+(tainted?'丢弃':'卖出')+'</button>';
+      '<button class="sellbtn" data-key="'+key+'">'+(tainted?'丢弃':'卖出')+'</button>';
     wrap.appendChild(row);
   }
-  wrap.querySelectorAll('.sellbtn').forEach(b=>b.addEventListener('click',()=>sellStack(b.dataset.id,b.dataset.tainted==='1')));
+  wrap.querySelectorAll('.sellbtn').forEach(b=>b.addEventListener('click',()=>sellStack(b.dataset.key)));
 }
-function sellStack(id,tainted){
-  const items=state.inv.filter(it=>it.id===id&&!!it.tainted===!!tainted);
+function sellStack(key){
+  const items=state.inv.filter(it=>stackKey(it)===key);
   if(!items.length)return;
+  const tainted=key.endsWith('#t');
+  const id=key.split('#')[0];
   let earned=0;if(!tainted)for(const it of items)earned+=itemPrice(it);
-  state.inv=state.inv.filter(it=>!(it.id===id&&!!it.tainted===!!tainted));
+  state.inv=state.inv.filter(it=>stackKey(it)!==key);
   state.coins+=earned;state.stats.sold+=items.length;state.stats.earned+=earned;
+  /* P4 4.5 赶早市：白昼结束前卖出的部分才计入单日累计 */
+  if(!tainted&&dayClock<daylightMs())bumpDayCounter('earlyMarket',items.length);
   toast(tainted?'🗑 丢弃了 '+items.length+' 朵已污染的'+SPMAP[id].n:'🪙 +'+earned+' 售出 '+items.length+' 朵 '+SPMAP[id].n);
   updateHUD();checkAch();save();
   renderSellList();
@@ -128,6 +148,7 @@ function sellAll(){
   for(const it of state.inv)earned+=itemPrice(it);
   state.inv=[];
   state.coins+=earned;state.stats.sold+=count;state.stats.earned+=earned;
+  if(dayClock<daylightMs())bumpDayCounter('earlyMarket',count);
   toast('🪙 +'+earned+' 一键卖出 '+count+' 朵');
   updateHUD();checkAch();save();
   renderSellList();
@@ -149,7 +170,8 @@ function renderOrderList(){
   wrap.innerHTML='';
   state.orders.forEach((o,i)=>{
     const sp=SPMAP[o.spId];if(!sp)return;
-    const have=state.inv.filter(it=>it.id===o.spId&&!it.tainted).length;
+    /* P4 4.2：委托只认 fr>=0.5 且非污染的个体 */
+    const have=state.inv.filter(it=>it.id===o.spId&&!it.tainted&&it.fr>=.5).length;
     const ok=have>=o.qty;
     const row=document.createElement('div');row.className='orow';
     row.innerHTML='<div class="onpc">'+o.npc+'</div>'+
@@ -163,11 +185,12 @@ function renderOrderList(){
 }
 function deliver(i){
   const o=state.orders[i];if(!o)return;
-  const have=state.inv.filter(it=>it.id===o.spId&&!it.tainted);
-  if(have.length<o.qty){toast('还差 '+(o.qty-have.length)+' 朵，凑够了再来吧');return;}
+  /* P4 4.2：委托交付要求 fr>=0.5 的个体 */
+  const have=state.inv.filter(it=>it.id===o.spId&&!it.tainted&&it.fr>=.5);
+  if(have.length<o.qty){toast('还差 '+(o.qty-have.length)+' 朵，凑够了再来吧（新鲜度不足 0.5 的不算数）');return;}
   let removed=0;
   state.inv=state.inv.filter(it=>{
-    if(it.id===o.spId&&!it.tainted&&removed<o.qty){removed++;return false;}
+    if(it.id===o.spId&&!it.tainted&&it.fr>=.5&&removed<o.qty){removed++;return false;}
     return true;
   });
   state.coins+=o.reward;state.stats.ordersDone++;
@@ -238,6 +261,8 @@ function setHutTab(tab){
 }
 function openHut(){
   ensureOrders();
+  const fc=forecast(),fcEl=document.getElementById('hutForecast');
+  if(fcEl)fcEl.textContent='明日：'+(WEATHER_ICON[fc]||'')+' '+(WEATHER_NAME[fc]||'');
   renderSellList();renderOrderList();renderToolList();
   setHutTab(hutTab);
   document.getElementById('hutModal').classList.add('show');

@@ -90,6 +90,7 @@ function doPick(){
   if(m.dogMarked&&m.buried)state.flags.dogNose=true; /* P3 成就：鼻子比眼灵 */
   state.inv.push({id:realId,q:1,fr:1,var:null,day:state.day,tainted:false});
   state.count[realId]=(state.count[realId]||0)+1;
+  if(dayClock>=duskEndMs())bumpDayCounter('duskPicks',1); /* P4 成就：月下归人 */
   if(state.weather==='rain')state.flags.rain=true;
   if(sp.sub==='wood'||sp.sub==='stump'||sp.sub==='trunk')state.flags.wood=(state.flags.wood||0)+1;
   if(sp.sub==='ring')state.flags.ring=true;
@@ -197,6 +198,10 @@ const ACH=[
   {id:'dog1',ic:'🐕',t:'最好的朋友',d:'购入猎菇犬',f:s=>!!s.tools.dog},
   {id:'dognose',ic:'👃',t:'鼻子比眼灵',d:'采到猎菇犬提示过的埋藏蘑菇',f:s=>!!s.flags.dogNose},
   {id:'toolsall',ic:'🎒',t:'装备齐全',d:'集齐全部工具',f:s=>['dog','boots','shovel','lens','lantern','basket1','basket2'].every(k=>s.tools[k])},
+  /* P4 新鲜度 + 一天一局 */
+  {id:'earlymkt',ic:'🌅',t:'赶早市',d:'白昼结束前，单日卖出 8 朵蘑菇',f:s=>dayCounterVal(s,'earlyMarket')>=8},
+  {id:'inkgone',ic:'🖤',t:'墨色的教训',d:'让一朵鬼伞类蘑菇自然融化',f:s=>s.inv.some(it=>(it.id==='inky'||it.id==='shaggy')&&it.fr<=0)},
+  {id:'moonpicker',ic:'🌙',t:'月下归人',d:'暮色中仍采到第 5 朵蘑菇',f:s=>dayCounterVal(s,'duskPicks')>=5},
 ];
 function checkAch(){
   for(const a of ACH){
@@ -422,7 +427,12 @@ scene.addEventListener('pointermove',e=>{
 function sceneUp(e){if(e.pointerId===scenePointerId)scenePointerId=null;}
 scene.addEventListener('pointerup',sceneUp);
 scene.addEventListener('pointercancel',sceneUp);
-document.getElementById('exploreBtn').onclick=()=>{if(!paused){newField(true);toast('🍃 你走得更深了…');}};
+document.getElementById('exploreBtn').onclick=()=>{
+  if(paused)return;
+  const wasDusk=dayClock>=duskEndMs();
+  newField(true);
+  toast(wasDusk?'🌙 你歇了一晚，天又亮了…':'🍃 你走得更深了…');
+};
 document.getElementById('biomeBtn').onclick=openBiome;
 document.getElementById('codexBtn').onclick=openCodex;
 document.getElementById('achBtn').onclick=openAch;
@@ -466,4 +476,11 @@ window.__mh={
   dog:()=>dogState,
   toolOwned:id=>!!state.tools[id],
   dogTargets:()=>dogTargets,
+  /* P4 新鲜度 + 一天一局 验收钩子 */
+  day:()=>state.day,
+  setClock:sec=>{dayClock=Math.max(0,(sec||0)*1000);checkDuskEdge();},
+  forecast:()=>forecast(),
+  freshness:()=>state.inv.map(i=>i.fr),
+  /* 附加调试钩子（非规格必需）：查看当前日光节律阶段，便于精确验收 4.3/4.6 的灯笼时长效果 */
+  phase:()=>dayClock<daylightMs()?'day':dayClock<duskEndMs()?'trans':'dusk',
 };

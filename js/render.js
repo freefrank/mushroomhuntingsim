@@ -216,7 +216,10 @@ function spawnWeather(){
   if(w==='rain'&&wparts.length<180)for(let i=0;i<Math.ceil(6*dtf);i++)wparts.push({k:'rain',x:Math.random()*(VW+120)-60,y:-10,vx:-1.4,vy:13,l:70});
   if(w==='snow'&&wparts.length<140)for(let i=0;i<Math.ceil(dtf);i++)wparts.push({k:'snow',x:Math.random()*VW,y:-6,vx:(Math.random()-.5)*.8,vy:1+Math.random()*.9,l:700,ph:Math.random()*6.28,s:1+Math.random()*1.6});
   if(w==='leaf'&&wparts.length<40&&Math.random()<.14*dtf)wparts.push({k:'leaf',x:Math.random()*VW,y:-8,vx:.7+Math.random()*1,vy:1+Math.random()*1,l:640,ph:Math.random()*6.28,rot:Math.random()*6.28,c:pick(Math.random,['#c86a25','#d98a3a','#b5471f','#e0a51f'])});
-  if(w==='firefly'&&wparts.length<34&&Math.random()<.12*dtf)wparts.push({k:'fly',x:Math.random()*VW,y:Math.random()*VH,vx:0,vy:0,l:900,ph:Math.random()*6.28});
+  if(w==='firefly'){ /* P4：暮色时萤火虫粒子加倍（4.3） */
+    const duskMul=dayClock>=duskEndMs()?2:1;
+    if(wparts.length<34*duskMul&&Math.random()<.12*dtf*duskMul)wparts.push({k:'fly',x:Math.random()*VW,y:Math.random()*VH,vx:0,vy:0,l:900,ph:Math.random()*6.28});
+  }
 }
 function stepWeather(){
   spawnWeather();
@@ -355,6 +358,9 @@ function loop(t){
   dtf=Math.min(4,Math.max(.25,lastT?(t-lastT)/16.667:1));lastT=t;
   fpsN++;if(t-fpsT>500){fpsEl.textContent=Math.round(fpsN*1000/(t-fpsT))+' FPS';fpsT=t;fpsN=0;}
   if(paused)return;
+  /* P4 日光节律：进入林地起累计的毫秒时钟（4.3） */
+  dayClock+=16.7*dtf;
+  checkDuskEdge();
   /* P2 观察：角色停 0.6s（蹲姿）→ 出鉴别卡，此间冻结移动输入 */
   if(inspectState){
     inspectState.timer-=16.7*dtf;
@@ -436,10 +442,27 @@ function loop(t){
   drawRays();
   stepWeather();
   seasonTint();
-  if(state.biome==='grove'&&state.tools.lantern){ /* P3 灯笼：暗角减弱 */
-    ctx.globalAlpha=.5;ctx.drawImage(VIG,0,0,VW,VH);ctx.globalAlpha=1;
-  }else ctx.drawImage(VIG,0,0,VW,VH);
+  dayNightOverlay();
+  let vigA=(state.biome==='grove'&&state.tools.lantern)?.5:1; /* P3 灯笼：暗角减弱 */
+  if(dayClock>=duskEndMs())vigA=Math.min(1,vigA+.15); /* P4：暮色暗角略增（4.3） */
+  ctx.globalAlpha=vigA;ctx.drawImage(VIG,0,0,VW,VH);ctx.globalAlpha=1;
   positionPrompt();
+}
+/* ====================== P4 日光节律：全屏色罩（4.3） ======================
+   0–4min(灯笼 6min) 白昼：无色罩；4–5min 黄昏渐变：暖橙先起后落、深蓝紫平滑升至暮色定值；
+   之后恒定暮色色罩。全程平滑插值，不叠加于 HUD/模态（二者是独立 DOM，不受画布影响）。 */
+function dayNightOverlay(){
+  const dl=daylightMs(),de=duskEndMs();
+  if(dayClock<dl)return;
+  if(dayClock<de){
+    const p=(dayClock-dl)/(de-dl);
+    const orangeA=Math.sin(Math.min(1,p)*Math.PI)*.18;
+    const blueA=(p*p*(3-2*p))*.28;
+    if(orangeA>.002){ctx.save();ctx.fillStyle=rgba('#ff9d52',orangeA);ctx.fillRect(0,0,VW,VH);ctx.restore();}
+    if(blueA>.002){ctx.save();ctx.fillStyle=rgba('#241f42',blueA);ctx.fillRect(0,0,VW,VH);ctx.restore();}
+  }else{
+    ctx.save();ctx.fillStyle=rgba('#241f42',.28);ctx.fillRect(0,0,VW,VH);ctx.restore();
+  }
 }
 const VIG=(function(){
   const c=mkCanvas(VW,VH);const g=c.getContext('2d');

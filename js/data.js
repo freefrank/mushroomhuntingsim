@@ -182,6 +182,13 @@ const MIMIC_TIPS={
   morel:'留意伞面纹理——羊肚菌是规则蜂窝状凹坑，鹿花菌是不规则脑状皱褶。',
   gyromitra:'留意伞面纹理——羊肚菌是规则蜂窝状凹坑，鹿花菌是不规则脑状皱褶。',
 };
+/* ====================== P4 新鲜度 + 一天一局 ====================== */
+/* 每过 1 天的新鲜度衰减速率：默认 default；速朽（鬼伞类）0.75；耐存（松露/灵芝/木耳/金针菇）0.10 */
+const DECAY={default:.25,inky:.75,shaggy:.75,truffle:.10,reishi:.10,woodear:.10,enoki:.10};
+/* 天气图标 / 中文名（HUD、小屋预报、入暮提示共用） */
+const WEATHER_ICON={clear:'☀️',cloud:'⛅',rain:'🌧️',fog:'🌫️',snow:'🌨️',leaf:'🍂',firefly:'✨'};
+const WEATHER_NAME={clear:'晴',cloud:'多云',rain:'有雨',fog:'起雾',snow:'落雪',leaf:'落叶纷飞',firefly:'流萤'};
+
 /* 非以上六种物种的通用观察文案，由 art / edi 粗略推导 */
 function genericTraits(sp){
   const a=sp.art;

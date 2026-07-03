@@ -437,19 +437,70 @@ function bakeDapple(rg){
   gc.restore();
 }
 
+/* ====================== P4 新鲜度 + 一天一局 ====================== */
+/* 跨天结算：每件背包物品按物种档位扣新鲜度，下限 0（4.2） */
+function decayInventory(){
+  for(const it of state.inv){
+    const rate=DECAY[it.id]!=null?DECAY[it.id]:DECAY.default;
+    it.fr=Math.max(0,Math.round((it.fr-rate)*100)/100);
+  }
+}
+/* 天气：用与「今日」同源的确定性 RNG（仅取决于 day/biome/season，与地图布局的种子解耦），
+   使「明日天气」可提前算出（4.4） */
+const WEATHER_CHOICES_BY_SEASON={
+  0:['clear','rain','cloud','fog','clear'],
+  1:['clear','clear','rain','cloud'],
+  2:['leaf','leaf','clear','fog','rain'],
+  3:['snow','snow','clear','fog'],
+};
+function weatherFor(day,biome,season){
+  if(biome==='grove')return 'firefly';
+  const rg=mulberry32(hash('wx'+day+biome+season));
+  return pick(rg,WEATHER_CHOICES_BY_SEASON[season]);
+}
+function forecast(){return weatherFor(state.day+1,state.biome,state.season);}
+
+/* ---------- 日光节律：进入林地起累计的毫秒时钟（4.3），跨文件共享 ---------- */
+let dayClock=0,_lastDusk=false;
+function daylightMs(){return(state.tools&&state.tools.lantern?6:4)*60000;} /* 灯笼：白昼 4min → 6min */
+function duskEndMs(){return daylightMs()+60000;} /* 之后 1 分钟黄昏渐变，再往后是恒定暮色 */
+function updateExploreBtnLabel(){
+  const btn=document.getElementById('exploreBtn');
+  if(btn)btn.textContent=(dayClock>=duskEndMs())?'🌙 歇一晚，明日再来':'🍃 深入林间';
+}
+function checkDuskEdge(){
+  const duskNow=dayClock>=duskEndMs();
+  if(duskNow!==_lastDusk){
+    _lastDusk=duskNow;
+    updateExploreBtnLabel();
+    if(duskNow){
+      const fc=forecast();
+      toast('🌙 天色暗了——今天收获不错，回小屋看看吧　明日：'+(WEATHER_ICON[fc]||'')+' '+(WEATHER_NAME[fc]||''));
+    }
+  }
+}
+function resetDayClock(){dayClock=0;_lastDusk=false;updateExploreBtnLabel();}
+
+/* ---------- 按 state.day 分桶累计的小工具（赶早市 / 月下归人 等单日成就） ---------- */
+function bumpDayCounter(key,n){
+  const f=state.flags;
+  const b=(f[key]&&f[key].day===state.day)?f[key]:{day:state.day,n:0};
+  b.n+=n;f[key]=b;
+  return b.n;
+}
+function dayCounterVal(s,key){
+  return(s.flags[key]&&s.flags[key].day===s.day)?s.flags[key].n:0;
+}
+
 /* ---------- field generation ---------- */
 function newField(advanceDay){
   /* 只有「深入林间」触发的调用会推进天数（P1 0.2）；切换季节/环境时 advanceDay 为假，不加天 */
-  if(advanceDay)state.day++;
+  if(advanceDay){state.day++;decayInventory();}
   state.depth++;if(state.depth>state.maxDepth)state.maxDepth=state.depth;
   const seed=hash(state.biome+state.season+'#'+state.depth+'@'+Math.floor(Math.random()*1e9));
   const rg=mulberry32(seed);
   const P=PAL();
-  const wchoices=state.season===3?['snow','snow','clear','fog']
-    :state.season===2?['leaf','leaf','clear','fog','rain']
-    :state.season===0?['clear','rain','cloud','fog','clear']
-    :['clear','clear','rain','cloud'];
-  state.weather=state.biome==='grove'?'firefly':pick(rg,wchoices);
+  state.weather=weatherFor(state.day,state.biome,state.season);
   setRainSound(state.weather==='rain');
   setBgm(state.biome);
   bakeGround(rg,P);
@@ -636,6 +687,7 @@ function newField(advanceDay){
   }
   state.visited.add(state.biome);
   ensureOrders();
+  resetDayClock(); /* P4：换林地重置日光节律计时（4.3） */
   if(typeof inspectState!=='undefined'&&inspectState)inspectState=null;
   if(typeof closeInspectCard==='function')closeInspectCard();
   updateHUD();refreshHint();checkAch();save();
