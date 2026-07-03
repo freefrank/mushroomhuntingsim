@@ -448,6 +448,7 @@ function newField(){
     :['clear','clear','rain','cloud'];
   state.weather=state.biome==='grove'?'firefly':pick(rg,wchoices);
   setRainSound(state.weather==='rain');
+  setBgm(state.biome);
   bakeGround(rg,P);
 
   decos=[];grassPatches=[];mushrooms=[];wparts=[];sparts=[];ripples=[];

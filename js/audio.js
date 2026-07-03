@@ -51,6 +51,41 @@ function setRainSound(on){
 function applyMute(){
   if(windNode)windNode.g.gain.value=muted?0:0.018;
   if(rainNode)rainNode.g.gain.value=muted?0:0.035;
+  applyBgmMute();
+}
+
+/* ====================== BGM (per-biome, crossfaded) ====================== */
+const BGM_FILES={forest:'assets/bgm/forest.mp3',meadow:'assets/bgm/meadow.mp3',pine:'assets/bgm/pine.mp3',
+  wetland:'assets/bgm/wetland.mp3',grove:'assets/bgm/grove.mp3'};
+const BGM_VOL=0.5;
+const bgmEls={};
+let bgmKey=null,bgmFadeReq=null;
+function bgmFor(key){
+  if(bgmEls[key])return bgmEls[key];
+  const a=new Audio(BGM_FILES[key]);
+  a.loop=true;a.preload='auto';a.volume=0;
+  bgmEls[key]=a;
+  return a;
+}
+function fadeAudio(a,to,ms,onDone){
+  const from=a.volume,t0=performance.now();
+  if(to>0&&a.paused)a.play().catch(()=>{});
+  (function step(){
+    const t=Math.min(1,(performance.now()-t0)/ms);
+    a.volume=from+(to-from)*t;
+    if(t<1)requestAnimationFrame(step);
+    else{if(to<=0.001)a.pause();if(onDone)onDone();}
+  })();
+}
+function setBgm(key){
+  if(!BGM_FILES[key]||bgmKey===key)return;
+  const prevKey=bgmKey;bgmKey=key;
+  if(prevKey&&bgmEls[prevKey])fadeAudio(bgmEls[prevKey],0,1400);
+  const next=bgmFor(key);
+  fadeAudio(next,muted?0:BGM_VOL,1400);
+}
+function applyBgmMute(){
+  if(bgmKey&&bgmEls[bgmKey])fadeAudio(bgmEls[bgmKey],muted?0:BGM_VOL,300);
 }
 function birdChirp(){
   const f0=2200+Math.random()*1200;
