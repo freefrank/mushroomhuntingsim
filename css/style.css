@@ -1,0 +1,180 @@
+@import url('https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Serif+SC:wght@400;600;700&display=swap');
+  :root{
+    --cream:#f4edda; --cream2:#e6dabd; --ink:#33291c; --ink2:#6b5b40;
+    --moss:#3d5732; --amber:#d9a441; --amber2:#a97f2b; --bark:#2a2115; --bark2:#3b2f1e;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{
+    background:#10150c;
+    background-image:radial-gradient(1100px 640px at 50% -8%, #26341a 0%, #161d10 48%, #10150c 100%);
+    font-family:'Noto Serif SC','Songti SC','SimSun',serif;color:var(--cream);
+    display:flex;align-items:center;justify-content:center;overflow:hidden;
+    user-select:none;-webkit-user-select:none;
+  }
+  #app{width:min(100vw,920px);height:100vh;max-height:980px;display:flex;flex-direction:column;padding:10px;gap:10px}
+
+  /* ---------- HUD ---------- */
+  #hud{display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+    background:linear-gradient(180deg,rgba(59,47,30,.92),rgba(38,30,19,.92));
+    border:1px solid rgba(217,164,65,.35);border-radius:14px;
+    box-shadow:0 6px 18px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,240,200,.08);padding:8px 12px}
+  .badge{display:flex;align-items:center;gap:6px;background:rgba(20,15,9,.55);
+    border:1px solid rgba(217,164,65,.22);border-radius:10px;padding:5px 11px;
+    color:var(--cream);font-size:16px;line-height:1.2}
+  .badge b{color:var(--amber);font-size:17px}
+  .grow{flex:1}
+  .seasons{display:flex;gap:5px}
+  .seasons button{font-size:17px;width:36px;height:36px;border-radius:10px;cursor:pointer;
+    border:1px solid rgba(217,164,65,.25);background:rgba(20,15,9,.5);color:var(--cream2);
+    transition:transform .1s, box-shadow .2s}
+  .seasons button.on{background:linear-gradient(180deg,#e9bd5c,#cf9a33);color:#31230a;
+    border-color:#8a6a20;box-shadow:0 0 14px rgba(233,189,92,.5)}
+  .seasons button:active{transform:translateY(1px)}
+  .iconbtn{font-family:inherit;font-size:16px;cursor:pointer;border:1px solid rgba(217,164,65,.3);
+    background:rgba(20,15,9,.5);color:var(--cream);border-radius:10px;padding:7px 13px;
+    transition:background .15s}
+  .iconbtn:hover{background:rgba(60,46,26,.7)}
+  .iconbtn:active{transform:translateY(1px)}
+
+  /* ---------- stage ---------- */
+  #stage{position:relative;border-radius:18px;overflow:hidden;
+    border:1px solid rgba(217,164,65,.35);
+    box-shadow:0 14px 34px rgba(0,0,0,.55), inset 0 0 0 1px rgba(0,0,0,.6);
+    background:#0c120a;flex:1;min-height:0;display:flex;align-items:center;justify-content:center}
+  #scene{width:100%;height:100%;display:block;cursor:crosshair;touch-action:none}
+  #prompt{position:absolute;transform:translate(-50%,-100%);background:rgba(30,23,13,.92);
+    border:1px solid rgba(233,189,92,.75);border-radius:9px;color:var(--cream);padding:4px 11px;
+    font-size:15px;white-space:nowrap;pointer-events:none;display:none;
+    box-shadow:0 4px 14px rgba(0,0,0,.5);animation:bob 1.2s ease-in-out infinite;z-index:4}
+  #prompt b{color:var(--amber)}
+  @keyframes bob{50%{transform:translate(-50%,-118%)}}
+  #hint{position:absolute;left:10px;top:10px;max-width:64%;background:rgba(22,17,10,.72);
+    border:1px solid rgba(217,164,65,.3);border-radius:10px;padding:6px 12px;font-size:14px;
+    color:var(--cream2);z-index:4;pointer-events:none;line-height:1.5;backdrop-filter:blur(3px)}
+  #hint b{color:var(--amber)}
+  #toasts{position:absolute;left:50%;bottom:70px;transform:translateX(-50%);display:flex;
+    flex-direction:column;align-items:center;gap:6px;z-index:6;pointer-events:none}
+  .toast{background:rgba(26,20,11,.92);border:1px solid rgba(233,189,92,.5);border-radius:10px;
+    padding:5px 15px;font-size:15px;color:var(--cream);animation:tpop 2.6s forwards;
+    box-shadow:0 4px 14px rgba(0,0,0,.4)}
+  .toast.ach{border-color:#7fc47f;color:#e2f2da}
+  @keyframes tpop{0%{opacity:0;transform:translateY(10px)}8%{opacity:1;transform:none}
+    80%{opacity:1}100%{opacity:0;transform:translateY(-10px)}}
+
+  /* joystick + pick */
+  #stick{position:absolute;left:16px;bottom:16px;width:96px;height:96px;border-radius:50%;
+    background:rgba(22,17,10,.4);border:1px solid rgba(217,164,65,.35);z-index:5;touch-action:none;
+    backdrop-filter:blur(2px)}
+  #knob{position:absolute;left:50%;top:50%;width:42px;height:42px;border-radius:50%;
+    background:radial-gradient(circle at 36% 30%, #ecc46b, #cf9a33);border:1px solid #6b511a;
+    transform:translate(-50%,-50%);box-shadow:0 3px 8px rgba(0,0,0,.4)}
+  #pickBtn{position:absolute;right:18px;bottom:20px;width:76px;height:76px;border-radius:50%;z-index:5;
+    font-family:inherit;font-weight:700;font-size:17px;color:#31230a;cursor:pointer;
+    background:radial-gradient(circle at 36% 28%, #f2d488, #d9a441 62%, #b9832a);
+    border:2px solid #6b511a;box-shadow:0 6px 16px rgba(0,0,0,.5), 0 0 22px rgba(217,164,65,.3)}
+  #pickBtn:active{transform:translateY(3px)}
+  @media (hover:hover) and (pointer:fine){ #stick{display:none} }
+
+  /* ---------- bottom bar ---------- */
+  #actions{display:flex;gap:10px}
+  .act{flex:1;font-family:inherit;font-size:17px;padding:12px 6px;cursor:pointer;
+    border:1px solid rgba(217,164,65,.35);border-radius:12px;
+    background:linear-gradient(180deg,rgba(59,47,30,.95),rgba(38,30,19,.95));
+    color:var(--cream);box-shadow:0 5px 14px rgba(0,0,0,.4);transition:filter .15s}
+  .act:hover{filter:brightness(1.12)}
+  .act.gold{background:linear-gradient(180deg,#ecc46b,#cf9a33);color:#31230a;font-weight:700;
+    border-color:#8a6a20;box-shadow:0 5px 14px rgba(0,0,0,.4), 0 0 20px rgba(217,164,65,.25)}
+  .act:active{transform:translateY(2px)}
+
+  /* ---------- modals ---------- */
+  .modal{position:fixed;inset:0;background:rgba(8,6,3,.72);display:none;align-items:center;
+    justify-content:center;z-index:40;padding:14px;backdrop-filter:blur(3px)}
+  .modal.show{display:flex}
+  .panel{width:min(94vw,680px);max-height:88vh;overflow:auto;
+    background:linear-gradient(180deg,#f6efdd,#eadfc2);
+    color:var(--ink);border:1px solid #9a7f4a;border-radius:18px;padding:20px;
+    box-shadow:0 24px 60px rgba(0,0,0,.6), inset 0 0 0 4px rgba(154,127,74,.18)}
+  .panel h2{font-family:'Ma Shan Zheng','Kaiti SC','KaiTi',cursive;font-size:26px;font-weight:400;
+    color:#4a3416;letter-spacing:2px}
+  .phead{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+  .phead .grow{flex:1}
+  .xbtn{font-size:17px;border:1px solid #9a7f4a;background:#f6efdd;border-radius:9px;
+    width:34px;height:34px;cursor:pointer;color:#6b5b40}
+  .xbtn:active{transform:translateY(1px)}
+  .pbar{height:10px;background:#d4c29a;border:1px solid #9a7f4a;border-radius:6px;overflow:hidden;margin:8px 0 14px}
+  .pbar i{display:block;height:100%;background:linear-gradient(90deg,#d9a441,#c07f2a)}
+  .filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+  .filters button{font-family:inherit;font-size:14px;border:1px solid #9a7f4a;background:#f6efdd;
+    color:#5a4526;border-radius:16px;padding:3px 13px;cursor:pointer}
+  .filters button.on{background:#d9a441;border-color:#7a5f22;color:#31230a;font-weight:700}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:9px;margin-top:8px}
+  .card{background:#fbf6e8;border:1px solid #c9b183;border-radius:12px;padding:9px 4px 7px;
+    text-align:center;cursor:pointer;position:relative;transition:box-shadow .15s,border-color .15s}
+  .card:hover{border-color:#8a6a30;box-shadow:0 4px 12px rgba(90,60,20,.18)}
+  .card img{width:58px;height:58px;object-fit:contain;display:block;margin:0 auto}
+  .card .nm{font-size:13px;margin-top:4px;color:#3d2f1a}
+  .card .dot{position:absolute;right:7px;top:7px;width:9px;height:9px;border-radius:50%;border:1px solid rgba(0,0,0,.35)}
+  .detail{display:flex;gap:16px;align-items:flex-start;margin-top:14px;background:#fbf6e8;
+    border:1px solid #c9b183;border-radius:14px;padding:14px}
+  .detail img{width:120px;height:120px;object-fit:contain;background:radial-gradient(circle at 50% 60%,#efe4c6,#e0d0a8);
+    border:1px solid #b99a63;border-radius:12px;flex:none}
+  .tag{display:inline-block;border-radius:10px;padding:1px 10px;font-size:13px;margin:0 5px 4px 0;border:1px solid rgba(0,0,0,.25)}
+  .eco{margin-top:5px;font-size:13.5px;color:#6b5335;line-height:1.55}
+  .lore{margin-top:6px;font-size:15px;line-height:1.6;color:#4d3d24}
+  .alist{display:flex;flex-direction:column;gap:8px}
+  .arow{display:flex;gap:12px;align-items:center;background:#fbf6e8;border:1px solid #c9b183;
+    border-radius:12px;padding:9px 14px}
+  .arow.locked{opacity:.45;filter:grayscale(.7)}
+  .arow .ic{font-size:24px}
+  .arow .t{font-size:16px;color:#3d2f1a;font-weight:700}
+  .arow .d{font-size:13px;color:#8a7350}
+  .blist{display:flex;flex-direction:column;gap:9px}
+  .brow{display:flex;gap:13px;align-items:center;background:#fbf6e8;border:1px solid #c9b183;
+    border-radius:12px;padding:11px 15px;cursor:pointer;font-size:17px;color:#3d2f1a}
+  .brow:hover{border-color:#8a6a30}
+  .brow.cur{outline:2px solid #d9a441}
+  .brow.locked{opacity:.5;cursor:not-allowed}
+  .brow .sub{font-size:13px;color:#8a7350;margin-top:2px}
+  .dangerbtn{margin-top:16px;font-family:inherit;font-size:14px;border:1px solid #a04030;color:#a04030;
+    background:#f6ddd6;border-radius:9px;padding:6px 14px;cursor:pointer}
+
+  /* ---------- discovery FX ---------- */
+  #fx{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;
+    flex-direction:column;gap:8px;background:rgba(7,5,2,.66);backdrop-filter:blur(4px)}
+  #fx.show{display:flex;animation:fxin .3s}
+  @keyframes fxin{from{opacity:0}to{opacity:1}}
+  #fxCanvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+  #fxTitle{font-family:'Ma Shan Zheng','Kaiti SC',cursive;font-size:24px;color:var(--amber);
+    text-shadow:0 0 18px rgba(233,189,92,.8);letter-spacing:6px;animation:fxpop .5s}
+  #fxSprite{width:190px;height:190px;object-fit:contain;filter:drop-shadow(0 14px 18px rgba(0,0,0,.6));
+    animation:rise .7s cubic-bezier(.2,1.4,.4,1)}
+  @keyframes rise{from{transform:translateY(50px) scale(.4);opacity:0}to{transform:none;opacity:1}}
+  @keyframes fxpop{from{transform:scale(.6);opacity:0}to{transform:none;opacity:1}}
+  #fxName{font-family:'Ma Shan Zheng','Kaiti SC',cursive;font-size:38px;font-weight:400;color:#fff;
+    text-shadow:0 2px 10px rgba(0,0,0,.7);letter-spacing:3px}
+  #fxEn{font-size:15px;color:var(--cream2);margin-top:-6px;font-style:italic}
+  #fxStars{font-size:19px;color:var(--amber);letter-spacing:4px}
+  #fxTagRar{border-radius:10px;padding:2px 13px;font-size:14px;color:#fff;border:1px solid rgba(255,255,255,.5)}
+  #fxEco{font-size:13.5px;color:#c9bb98;max-width:min(84vw,440px);text-align:center}
+  #fxLore{max-width:min(84vw,450px);text-align:center;font-size:16px;color:var(--cream);line-height:1.6;margin-top:2px}
+  #fxGo{margin-top:12px;font-family:inherit;font-weight:700;font-size:16px;padding:12px 26px;cursor:pointer;
+    background:linear-gradient(180deg,#ecc46b,#cf9a33);color:#31230a;border:1px solid #8a6a20;
+    border-radius:12px;box-shadow:0 6px 16px rgba(0,0,0,.5)}
+  #fxGo:active{transform:translateY(2px)}
+
+  /* ---------- start ---------- */
+  #start{position:fixed;inset:0;z-index:60;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:14px;text-align:center;padding:20px;
+    background:radial-gradient(900px 520px at 50% 28%, #2e401f 0%, rgba(22,29,16,0) 62%),
+      radial-gradient(1100px 640px at 50% -8%, #26341a 0%, #161d10 48%, #10150c 100%)}
+  #start h1{font-family:'Ma Shan Zheng','Kaiti SC','KaiTi',cursive;font-size:64px;font-weight:400;
+    color:#ecc46b;letter-spacing:14px;text-shadow:0 4px 0 #4a3410, 0 0 42px rgba(233,189,92,.4)}
+  #start p{font-size:16.5px;color:var(--cream2);max-width:460px;line-height:1.8}
+  #start .keys{font-size:13.5px;color:#9a8a62}
+  .titlemush{width:110px;height:110px;object-fit:contain;filter:drop-shadow(0 10px 14px rgba(0,0,0,.55))}
+  #startBtn{font-family:inherit;font-weight:700;font-size:19px;cursor:pointer;margin-top:8px;
+    background:linear-gradient(180deg,#ecc46b,#cf9a33);color:#31230a;border:1px solid #8a6a20;
+    border-radius:14px;padding:15px 42px;letter-spacing:4px;
+    box-shadow:0 8px 22px rgba(0,0,0,.5), 0 0 30px rgba(217,164,65,.3)}
+  #startBtn:active{transform:translateY(2px)}

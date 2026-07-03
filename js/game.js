@@ -1,0 +1,322 @@
+"use strict";
+/* ====================== pick & discovery ====================== */
+function toast(msg,cls){
+  const t=document.createElement('div');t.className='toast'+(cls?' '+cls:'');t.innerHTML=msg;
+  document.getElementById('toasts').appendChild(t);
+  setTimeout(()=>t.remove(),2600);
+}
+function ecoText(sp){
+  let s='生长于'+SUBTXT[sp.sub];
+  if(sp.host)s+='，与'+HOSTTXT[sp.host]+'相伴';
+  s+='。时节：'+sp.seasons.map(i=>SEASONS[i].n).join('、');
+  if(sp.rain)s+='（雨后最盛）';
+  return s;
+}
+function doPick(){
+  if(!activeM||paused)return;
+  const m=activeM,sp=SPMAP[m.id];
+  m.picked=true;state.picks++;state.basket++;
+  state.count[m.id]=(state.count[m.id]||0)+1;
+  if(state.weather==='rain')state.flags.rain=true;
+  if(sp.sub==='wood'||sp.sub==='stump'||sp.sub==='trunk')state.flags.wood=(state.flags.wood||0)+1;
+  if(sp.sub==='ring')state.flags.ring=true;
+  puff(m.x,m.y,RAR[sp.r].c,12+sp.r*5);
+  const isNew=!state.disc.has(m.id);
+  if(isNew){
+    state.disc.add(m.id);
+    if(state.season===3)state.flags.winterDisc=(state.flags.winterDisc||0)+1;
+    discovery(sp);
+  }
+  else{sfxPick();toast('🧺 +1 '+sp.n);}
+  updateHUD();checkAch();refreshHint();save();
+}
+const fx=document.getElementById('fx'),fxCanvas=document.getElementById('fxCanvas'),fxc=fxCanvas.getContext('2d');
+let fxParts=[],fxRun=false,fxRarity=0;
+function discovery(sp){
+  paused=true;fxRarity=sp.r;
+  const rar=RAR[sp.r];
+  document.getElementById('fxSprite').src=paintMushroom(sp,7).canvas.toDataURL();
+  document.getElementById('fxName').textContent=sp.n;
+  document.getElementById('fxEn').textContent=sp.en;
+  document.getElementById('fxStars').textContent='★'.repeat(rar.s)+'☆'.repeat(5-rar.s);
+  const tg=document.getElementById('fxTagRar');tg.textContent=rar.n;tg.style.background=rar.c;
+  document.getElementById('fxEco').textContent=ecoText(sp);
+  document.getElementById('fxLore').textContent=sp.lore;
+  fxCanvas.width=innerWidth;fxCanvas.height=innerHeight;
+  fxParts=[];
+  const cx=innerWidth/2,cy=innerHeight/2-30;
+  const n=reduced?0:70+sp.r*45;
+  for(let i=0;i<n;i++){
+    const a=Math.random()*6.28,v=1.2+Math.random()*(3.2+sp.r*1.1);
+    fxParts.push({x:cx,y:cy,vx:Math.cos(a)*v,vy:Math.sin(a)*v-1.1,g:.05,
+      l:50+Math.random()*50,s:Math.random()<.25?3:2,
+      c:sp.r>=4?pick(Math.random,['#ffe9a0','#ffd24a','#fff','#ffb84a']):mix(rar.c,'#ffffff',Math.random()*.5)});
+  }
+  fx.classList.add('show');fx.style.display='flex';
+  sfxDiscover(sp.r);
+  if(!fxRun){fxRun=true;requestAnimationFrame(fxLoop);}
+}
+function fxLoop(){
+  if(!fx.classList.contains('show')){fxRun=false;return;}
+  requestAnimationFrame(fxLoop);
+  fxc.clearRect(0,0,fxCanvas.width,fxCanvas.height);
+  const cx=fxCanvas.width/2,cy=fxCanvas.height/2-30;
+  if(fxRarity>=4&&!reduced){
+    fxc.save();fxc.translate(cx,cy);fxc.rotate(tnow/1400);
+    for(let i=0;i<10;i++){
+      fxc.rotate(Math.PI/5);
+      const g=fxc.createLinearGradient(0,0,0,-460);
+      g.addColorStop(0,'rgba(255,215,90,.2)');g.addColorStop(1,'rgba(255,215,90,0)');
+      fxc.fillStyle=g;fxc.beginPath();fxc.moveTo(0,0);fxc.lineTo(-36,-460);fxc.lineTo(36,-460);fxc.fill();
+    }
+    fxc.restore();
+  }
+  for(let i=fxParts.length-1;i>=0;i--){
+    const q=fxParts[i];
+    q.x+=q.vx;q.y+=q.vy;q.vy+=q.g;q.l--;
+    if(q.l<=0){fxParts.splice(i,1);continue;}
+    fxc.globalAlpha=Math.min(1,q.l/30);fxc.fillStyle=q.c;
+    fxc.beginPath();fxc.arc(q.x,q.y,q.s,0,7);fxc.fill();
+  }
+  fxc.globalAlpha=1;
+}
+document.getElementById('fxGo').onclick=()=>{fx.classList.remove('show');fx.style.display='none';paused=false;};
+
+/* ====================== achievements ====================== */
+const ACH=[
+  {id:'first',ic:'🍄',t:'第一朵',d:'采集你的第一朵蘑菇',f:s=>s.picks>=1},
+  {id:'p10',ic:'🧺',t:'采集学徒',d:'累计采集 10 朵',f:s=>s.picks>=10},
+  {id:'p50',ic:'🎒',t:'篮不落空',d:'累计采集 50 朵',f:s=>s.picks>=50},
+  {id:'d5',ic:'📖',t:'图鉴新人',d:'记录 5 个物种',f:s=>s.disc.size>=5},
+  {id:'d15',ic:'🔬',t:'博物学家',d:'记录 15 个物种',f:s=>s.disc.size>=15},
+  {id:'d30',ic:'🎓',t:'菌物学者',d:'记录 30 个物种',f:s=>s.disc.size>=30},
+  {id:'dall',ic:'👑',t:'菌中之王',d:'集齐全部 '+TOTAL+' 个物种',f:s=>s.disc.size>=TOTAL},
+  {id:'legend',ic:'🌟',t:'传说之遇',d:'发现一种传说级蘑菇',f:s=>[...s.disc].some(id=>SPMAP[id].r===4)},
+  {id:'poison',ic:'☠️',t:'险中识毒',d:'记录 4 种有毒或剧毒的蘑菇',f:s=>[...s.disc].filter(id=>['poison','deadly'].includes(SPMAP[id].edi)).length>=4},
+  {id:'glow',ic:'💡',t:'夜光奇遇',d:'发现一种会发光的蘑菇',f:s=>[...s.disc].some(id=>SPMAP[id].art.glow)},
+  {id:'wood',ic:'🪵',t:'朽木生花',d:'采到 5 朵长在枯木上的蘑菇',f:s=>(s.flags.wood||0)>=5},
+  {id:'ring',ic:'🧚',t:'仙女环',d:'在草甸采到蘑菇圈里的蘑菇',f:s=>!!s.flags.ring},
+  {id:'rain',ic:'🌧️',t:'雨中漫步',d:'在雨天采到一朵蘑菇',f:s=>!!s.flags.rain},
+  {id:'winter',ic:'⛄',t:'踏雪寻菇',d:'在冬季记录 2 个新物种',f:s=>(s.flags.winterDisc||0)>=2},
+  {id:'deep',ic:'🧭',t:'深山探险',d:'深入林间 10 次',f:s=>s.maxDepth>=10},
+  {id:'travel',ic:'🗺️',t:'走遍四方',d:'探访全部 5 种环境',f:s=>s.visited.size>=5},
+];
+function checkAch(){
+  for(const a of ACH){
+    if(state.ach.has(a.id))continue;
+    let ok=false;try{ok=a.f(state);}catch(e){}
+    if(ok){state.ach.add(a.id);toast(a.ic+' 成就达成：'+a.t,'ach');sfxAch();}
+  }
+}
+function refreshHint(){
+  const hint=document.getElementById('hint');
+  const pool=SP.filter(s=>s.biome===state.biome&&s.seasons.includes(state.season));
+  const newHere=mushrooms.some(m=>!m.picked&&!state.disc.has(m.id));
+  const hiddenHere=mushrooms.some(m=>!m.picked&&!m.revealed);
+  let msg='';
+  if(!pool.length){
+    msg='❄️ 冬日的'+BIOMES[state.biome].n+'一片寂静，几乎见不到菌子。<br>去<b>阔叶林</b>看看吧——枯木上还有平菇和金针菇，栎树下埋着松露。';
+  }
+  else if(!mushrooms.length)msg='这片林子静悄悄的，试试<b>深入林间</b>。';
+  else if(newHere)msg='✦ 这片林子里似乎藏着<b>未知的菌类</b>…';
+  else if(hiddenHere){
+    msg=state.weather==='rain'?'雨水正唤醒泥土里的菌丝，留意草丛与枯木。':'留意草丛里的<b>微光</b>，有东西藏在附近。';
+  }
+  else if(mushrooms.some(m=>!m.picked))msg='还有几朵没采完。';
+  else msg='这片采完了。试试<b>深入林间</b>，或换个季节与环境。';
+  hint.innerHTML=msg;
+}
+
+/* ====================== HUD & modals ====================== */
+function updateHUD(){
+  document.getElementById('basketN').textContent=state.basket;
+  document.getElementById('discN').textContent=state.disc.size;
+  document.getElementById('totN').textContent=TOTAL;
+  document.getElementById('biomeBtn').textContent=BIOMES[state.biome].ic+' '+BIOMES[state.biome].n;
+  const wic={clear:'☀️',cloud:'⛅',rain:'🌧️',fog:'🌫️',snow:'🌨️',leaf:'🍂',firefly:'✨'}[state.weather]||'☀️';
+  document.getElementById('weatherBadge').textContent=wic;
+  document.querySelectorAll('#seasonPills button').forEach((b,i)=>b.classList.toggle('on',i===state.season));
+}
+const pillWrap=document.getElementById('seasonPills');
+SEASONS.forEach((s,i)=>{
+  const b=document.createElement('button');b.textContent=s.ic;b.title=s.n;
+  b.onclick=()=>{if(state.season===i)return;state.season=i;state.depth=0;newField();toast(s.ic+' 季节流转：'+s.n);};
+  pillWrap.appendChild(b);
+});
+function openBiome(){
+  const list=document.getElementById('biomeList');list.innerHTML='';
+  for(const[id,b]of Object.entries(BIOMES)){
+    const unlocked=state.disc.size>=b.req;
+    const row=document.createElement('div');
+    row.className='brow'+(id===state.biome?' cur':'')+(unlocked?'':' locked');
+    row.innerHTML='<span style="font-size:24px">'+b.ic+'</span><div><div>'+b.n+'</div>'+
+      '<div class="sub">'+(unlocked?b.desc:'图鉴记录满 '+b.req+' 种后解锁（当前 '+state.disc.size+'）')+'</div></div>';
+    if(unlocked)row.onclick=()=>{
+      document.getElementById('biomeModal').classList.remove('show');
+      if(id!==state.biome){state.biome=id;state.depth=0;newField();toast(b.ic+' 来到了'+b.n);}
+    };
+    list.appendChild(row);
+  }
+  document.getElementById('biomeModal').classList.add('show');
+}
+let cdxFilter='all',cdxSeason=-1;
+function openCodex(){
+  const md=document.getElementById('codexModal');
+  document.getElementById('cdxN').textContent=state.disc.size;
+  document.getElementById('cdxT').textContent=TOTAL;
+  document.getElementById('cdxBar').style.width=(state.disc.size/TOTAL*100)+'%';
+  const flt=document.getElementById('cdxFilters');flt.innerHTML='';
+  const opts=[['all','全部'],...Object.entries(BIOMES).map(([id,b])=>[id,b.n])];
+  for(const[id,nm]of opts){
+    const b=document.createElement('button');b.textContent=nm;
+    b.className=cdxFilter===id?'on':'';
+    b.onclick=()=>{cdxFilter=id;openCodex();};
+    flt.appendChild(b);
+  }
+  const sflt=document.getElementById('cdxSeasonFilters');sflt.innerHTML='';
+  const sopts=[[-1,'四季'],[0,'🌸 春'],[1,'☀️ 夏'],[2,'🍂 秋'],[3,'❄️ 冬']];
+  for(const[i,nm]of sopts){
+    const b=document.createElement('button');b.textContent=nm;
+    b.className=cdxSeason===i?'on':'';
+    b.onclick=()=>{cdxSeason=i;openCodex();};
+    sflt.appendChild(b);
+  }
+  const grid=document.getElementById('cdxGrid');grid.innerHTML='';
+  document.getElementById('cdxDetail').style.display='none';
+  for(const sp of SP){
+    if(cdxFilter!=='all'&&sp.biome!==cdxFilter)continue;
+    if(cdxSeason>=0&&!sp.seasons.includes(cdxSeason))continue;
+    const known=state.disc.has(sp.id);
+    const card=document.createElement('div');card.className='card';
+    const img=document.createElement('img');
+    img.src=known?spriteURL(sp.id):silhouetteURL(sp);
+    card.appendChild(img);
+    const nm=document.createElement('div');nm.className='nm';nm.textContent=known?sp.n:'？？？';
+    card.appendChild(nm);
+    const dot=document.createElement('span');dot.className='dot';dot.style.background=RAR[sp.r].c;
+    card.appendChild(dot);
+    if(known)card.onclick=()=>showDetail(sp);
+    grid.appendChild(card);
+  }
+  md.classList.add('show');
+}
+function showDetail(sp){
+  const d=document.getElementById('cdxDetail');
+  const rar=RAR[sp.r],edi=EDI[sp.edi];
+  d.innerHTML='';
+  const im=document.createElement('img');im.src=spriteURL(sp.id);
+  d.appendChild(im);
+  const info=document.createElement('div');
+  info.innerHTML='<div style="font-size:22px;color:#3d2f1a;font-weight:700">'+sp.n+
+    ' <span style="font-size:13px;color:#8a7350;font-style:italic;font-weight:400">'+sp.en+'</span></div>'+
+    '<div style="margin:6px 0 2px"><span class="tag" style="background:'+rar.c+';color:#fff">'+rar.n+'</span>'+
+    '<span class="tag" style="background:'+edi.b+';color:'+edi.c+'">'+edi.t+'</span>'+
+    '<span class="tag" style="background:#efe6cf;color:#6b4a26">'+BIOMES[sp.biome].n+'</span>'+
+    (sp.rain?'<span class="tag" style="background:#dceaf4;color:#3a6a8a">🌧️ 雨后</span>':'')+'</div>'+
+    '<div class="eco">'+ecoText(sp)+'　·　季节：'+sp.seasons.map(i=>SEASONS[i].ic).join(' ')+
+    '　·　已采集 '+(state.count[sp.id]||0)+' 朵</div>'+
+    '<div class="lore">'+sp.lore+'</div>';
+  d.appendChild(info);
+  d.style.display='flex';
+}
+function openAch(){
+  const list=document.getElementById('achList');list.innerHTML='';
+  for(const a of ACH){
+    const got=state.ach.has(a.id);
+    const row=document.createElement('div');row.className='arow'+(got?'':' locked');
+    row.innerHTML='<span class="ic">'+a.ic+'</span><div><div class="t">'+a.t+(got?' ✓':'')+'</div><div class="d">'+a.d+'</div></div>';
+    list.appendChild(row);
+  }
+  document.getElementById('achModal').classList.add('show');
+}
+document.getElementById('resetBtn').onclick=()=>{
+  state.disc.clear();state.ach.clear();state.picks=0;state.basket=0;state.count={};
+  state.maxDepth=0;state.depth=0;
+  state.flags={rain:false,wood:0,ring:false,winterDisc:0};state.visited.clear();
+  save();newField();openAch();updateHUD();toast('进度已重置');
+};
+
+/* ====================== input ====================== */
+addEventListener('keydown',e=>{
+  if(e.repeat)return;
+  const k=e.key.toLowerCase();
+  if(k==='w'||k==='arrowup')keys.up=true;
+  if(k==='s'||k==='arrowdown')keys.down=true;
+  if(k==='a'||k==='arrowleft')keys.left=true;
+  if(k==='d'||k==='arrowright')keys.right=true;
+  if(k===' '||k==='e'){e.preventDefault();if(fx.classList.contains('show'))document.getElementById('fxGo').click();else doPick();}
+  if(e.key==='Escape')document.querySelectorAll('.modal.show').forEach(m=>m.classList.remove('show'));
+});
+addEventListener('keyup',e=>{
+  const k=e.key.toLowerCase();
+  if(k==='w'||k==='arrowup')keys.up=false;
+  if(k==='s'||k==='arrowdown')keys.down=false;
+  if(k==='a'||k==='arrowleft')keys.left=false;
+  if(k==='d'||k==='arrowright')keys.right=false;
+});
+const stick=document.getElementById('stick'),knob=document.getElementById('knob');
+let stickId=null;
+stick.addEventListener('pointerdown',e=>{stickId=e.pointerId;stick.setPointerCapture(stickId);stickMove(e);});
+stick.addEventListener('pointermove',e=>{if(e.pointerId===stickId)stickMove(e);});
+function stickEnd(e){if(e.pointerId===stickId){stickId=null;stickV={x:0,y:0};knob.style.transform='translate(-50%,-50%)';}}
+stick.addEventListener('pointerup',stickEnd);stick.addEventListener('pointercancel',stickEnd);
+function stickMove(e){
+  const r=stick.getBoundingClientRect();
+  let dx=(e.clientX-(r.left+r.width/2))/(r.width/2),dy=(e.clientY-(r.top+r.height/2))/(r.height/2);
+  const d=Math.hypot(dx,dy);if(d>1){dx/=d;dy/=d;}
+  stickV={x:dx,y:dy};
+  knob.style.transform='translate(calc(-50% + '+(dx*24)+'px),calc(-50% + '+(dy*24)+'px))';
+}
+document.getElementById('pickBtn').addEventListener('pointerdown',e=>{e.preventDefault();doPick();});
+/* 全鼠标/触屏操控：点地面走过去，按住拖动持续移动，点蘑菇自动走近并采集 */
+let scenePointerId=null;
+function clampTarget(w){
+  return {x:Math.max(20,Math.min(WW-20,w.x)),y:Math.max(40,Math.min(WH-12,w.y))};
+}
+scene.addEventListener('pointerdown',e=>{
+  if(paused)return;
+  const w=view2world(e);
+  let near=null,bd=1e9;
+  for(const m of mushrooms){
+    if(m.picked||!m.revealed)continue;
+    const d=Math.hypot(m.x-w.x,m.y-w.y);if(d<34&&d<bd){bd=d;near=m;}
+  }
+  if(near){
+    if(Math.hypot(near.x-player.x,near.y-player.y)<40){
+      activeM=near;doPick();pendingPick=null;target=null;
+    }else{
+      pendingPick=near;
+      target={x:near.x,y:Math.min(WH-12,near.y+6)};
+    }
+    return;
+  }
+  pendingPick=null;
+  scenePointerId=e.pointerId;
+  try{scene.setPointerCapture(scenePointerId);}catch(err){}
+  target=clampTarget(w);
+});
+scene.addEventListener('pointermove',e=>{
+  if(paused||e.pointerId!==scenePointerId)return;
+  target=clampTarget(view2world(e));
+});
+function sceneUp(e){if(e.pointerId===scenePointerId)scenePointerId=null;}
+scene.addEventListener('pointerup',sceneUp);
+scene.addEventListener('pointercancel',sceneUp);
+document.getElementById('exploreBtn').onclick=()=>{if(!paused){newField();toast('🍃 你走得更深了…');}};
+document.getElementById('biomeBtn').onclick=openBiome;
+document.getElementById('codexBtn').onclick=openCodex;
+document.getElementById('achBtn').onclick=openAch;
+document.getElementById('muteBtn').onclick=function(){muted=!muted;applyMute();this.textContent=muted?'🔇':'🔊';};
+document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{
+  if(e.target===m||e.target.dataset.close!==undefined)m.classList.remove('show');}));
+
+/* ====================== boot ====================== */
+document.getElementById('titleMush').src=paintMushroom(SPMAP['amanita'],6).canvas.toDataURL();
+document.getElementById('startBtn').onclick=async()=>{
+  ac();startAmbience();await load();
+  newField();
+  document.getElementById('start').style.display='none';
+  paused=false;
+};
+document.getElementById('totN').textContent=TOTAL;
+window.__mh={state,newField,SP,SPRITE,player,cam,view:()=>({VW,VH}),mushrooms:()=>mushrooms,pick:()=>doPick(),setActive:m=>{activeM=m;},setPaused:v=>{paused=v;}};
