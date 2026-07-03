@@ -14,7 +14,8 @@ const state={
   tools:{},              // 已购工具（P3）
   buffs:{},              // 烹饪增益（P5）
   cooked:[],             // 已做过的菜（P5）
-  stats:{sold:0,earned:0,ordersDone:0,mimicCaught:0,mimicFooled:0},
+  stats:{sold:0,earned:0,ordersDone:0,mimicCaught:0,mimicFooled:0,photos:0},
+  best:{},                // P6 图鉴最佳品质/变异记录：{id:{q:1-3, v:{albino,gilded}}}
 };
 const store={
   async get(k){
@@ -33,7 +34,7 @@ async function save(){
       season:state.season,biome:state.biome,maxDepth:state.maxDepth,picks:state.picks,
       disc:[...state.disc],count:state.count,ach:[...state.ach],flags:state.flags,visited:[...state.visited],
       coins:state.coins,inv:state.inv,cap:state.cap,day:state.day,orders:state.orders,
-      tools:state.tools,buffs:state.buffs,cooked:state.cooked,stats:state.stats,
+      tools:state.tools,buffs:state.buffs,cooked:state.cooked,stats:state.stats,best:state.best,
     }));
   }catch(e){}
 }
@@ -50,7 +51,8 @@ async function load(){
     /* v2+ 字段：旧档（无 v，或字段缺失）一律给默认值，旧的数字 basket 直接丢弃 */
     state.coins=typeof d.coins==='number'&&d.coins>=0?d.coins:0;
     state.inv=Array.isArray(d.inv)?d.inv.filter(it=>it&&SPMAP[it.id]).map(it=>({
-      id:it.id,q:it.q||1,fr:it.fr==null?1:it.fr,var:it.var||null,day:it.day||d.day||1,tainted:!!it.tainted})):[];
+      id:it.id,q:[1,2,3].includes(it.q)?it.q:1,fr:it.fr==null?1:it.fr,
+      var:(it.var==='albino'||it.var==='gilded')?it.var:null,day:it.day||d.day||1,tainted:!!it.tainted})):[];
     state.cap=typeof d.cap==='number'&&d.cap>0?d.cap:25;
     state.day=typeof d.day==='number'&&d.day>0?d.day:1;
     state.orders=Array.isArray(d.orders)?d.orders.filter(o=>o&&SPMAP[o.spId]):[];
@@ -60,6 +62,16 @@ async function load(){
     else if(state.tools.basket1)state.cap=Math.max(state.cap,40);
     state.buffs=d.buffs&&typeof d.buffs==='object'?d.buffs:{};
     state.cooked=Array.isArray(d.cooked)?d.cooked:[];
-    state.stats=Object.assign({sold:0,earned:0,ordersDone:0,mimicCaught:0,mimicFooled:0},d.stats||{});
+    state.stats=Object.assign({sold:0,earned:0,ordersDone:0,mimicCaught:0,mimicFooled:0,photos:0},d.stats||{});
+    /* P6 6.5：图鉴最佳品质/变异记录，旧档（无 best 字段）兜底为空对象，逐条校验避免脏数据炸渲染 */
+    state.best={};
+    if(d.best&&typeof d.best==='object'){
+      for(const k of Object.keys(d.best)){
+        if(!SPMAP[k])continue;
+        const b=d.best[k]||{};
+        state.best[k]={q:[1,2,3].includes(b.q)?b.q:1,
+          v:{albino:!!(b.v&&b.v.albino),gilded:!!(b.v&&b.v.gilded)}};
+      }
+    }
   }catch(e){}
 }

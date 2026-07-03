@@ -15,10 +15,13 @@ function ensurePriceMap(){
   for(const sp of SP)_priceMap[sp.id]=.8+rg()*.6;
 }
 function priceFactor(id){ensurePriceMap();return _priceMap[id]||1;}
-function priceOf(id,q,fr){
+/* P6 6.1/6.2：品质倍率 1/1.5/2.5（QUALITY 表）× 变异倍率 ×5（VARIANTS 表），二者独立相乘接入定价 */
+function priceOf(id,q,fr,vr){
   const sp=SPMAP[id];if(!sp)return 0;
   q=q==null?1:q;fr=fr==null?1:fr;
-  return Math.round(unitBase(sp)*priceFactor(id)*q*(.4+.6*fr));
+  const qmul=(QUALITY[q]&&QUALITY[q].mul)||1;
+  const vmul=(vr&&VARIANTS[vr])?VARIANTS[vr].mul:1;
+  return Math.round(unitBase(sp)*priceFactor(id)*qmul*vmul*(.4+.6*fr));
 }
 
 /* ---------- 委托 ---------- */
@@ -66,11 +69,25 @@ function ensureOrders(){
 }
 
 /* ---------- 出售页签 ---------- */
-/* P4：分堆键——tainted（污染）与「已自融」（fr=0 的鬼伞类）各自单独成堆，其余按物种聚合 */
+/* P4：分堆键——tainted（污染）与「已自融」（fr=0 的鬼伞类）各自单独成堆；
+   P6：品质/变异也各自成堆，便于出售行分别显示前缀与单价 */
 function stackKey(it){
   if(it.tainted)return it.id+'#t';
   if((it.id==='inky'||it.id==='shaggy')&&it.fr<=0)return it.id+'#m';
-  return it.id;
+  let k=it.id;
+  if(it.q&&it.q>1)k+='#q'+it.q;
+  if(it.var)k+='#v'+it.var;
+  return k;
+}
+function parseStackKey(key){
+  const tainted=key.endsWith('#t'),melted=key.endsWith('#m');
+  const id=key.split('#')[0];
+  let q=1,vr=null;
+  if(!tainted&&!melted){
+    const mq=key.match(/#q(\d)/);if(mq)q=+mq[1];
+    const mv=key.match(/#v(\w+)/);if(mv)vr=mv[1];
+  }
+  return{id,tainted,melted,q,vr};
 }
 function stackInv(){
   const map={};
@@ -84,7 +101,7 @@ function stackInv(){
 function itemPrice(it){
   if(it.tainted)return 0;
   if((it.id==='inky'||it.id==='shaggy')&&it.fr<=0)return 1;
-  return priceOf(it.id,it.q,it.fr);
+  return priceOf(it.id,it.q,it.fr,it.var);
 }
 function renderSellList(){
   const capEl=document.getElementById('hutCapN'),invEl=document.getElementById('hutInvN');
@@ -104,8 +121,7 @@ function renderSellList(){
     return SPMAP[idB].r-SPMAP[idA].r;
   });
   for(const key of keys){
-    const tainted=key.endsWith('#t'),melted=key.endsWith('#m');
-    const id=key.split('#')[0];
+    const{id,tainted,melted,q,vr}=parseStackKey(key);
     const sp=SPMAP[id],items=map[key],n=items.length;
     /* 堆内逐件按各自 fr 计价再加总，行内单价显示为均价 */
     const total=items.reduce((s,it)=>s+itemPrice(it),0);
@@ -116,11 +132,15 @@ function renderSellList(){
     const pharm=(!tainted&&(sp.edi==='poison'||sp.edi==='deadly'))?' <span class="pharm">⚗ 药铺收购</span>':'';
     const taintedTag=tainted?' <span class="taintedtag">已污染</span>':'';
     const meltedTag=melted?'（已自融 🖤）':'';
+    /* P6 6.1/6.2：出售行按品质/变异着色前缀 */
+    let qvPrefix='';
+    if(vr&&VARIANTS[vr])qvPrefix='<span class="qtag '+vr+'">'+VARIANTS[vr].n+'</span>';
+    else if(q>=2&&QUALITY[q])qvPrefix='<span class="qtag q'+q+'">'+QUALITY[q].n+'</span>';
     const frCls=avgFr>=.7?'fr-green':avgFr>=.4?'fr-yellow':'fr-gray';
     const frBar=tainted?'':'<span class="frtrack" title="新鲜度约 '+Math.round(avgFr*100)+'%"><i class="fri '+frCls+'" style="width:'+Math.round(avgFr*100)+'%"></i></span>';
     const row=document.createElement('div');row.className='sellrow'+(tainted?' tainted':'');
-    row.innerHTML='<img src="'+spriteURL(id)+'" alt="">'+
-      '<div class="sinfo"><div class="sname">'+sp.n+meltedTag+arrow+pharm+taintedTag+'</div>'+
+    row.innerHTML='<img src="'+spriteURL(id,vr)+'" alt="">'+
+      '<div class="sinfo"><div class="sname">'+qvPrefix+sp.n+meltedTag+arrow+pharm+taintedTag+'</div>'+
       '<div class="sunit">单价约 '+unit+' 🪙 × '+n+frBar+'</div></div>'+
       '<div class="stotal">'+total+' 🪙</div>'+
       '<button class="sellbtn" data-key="'+key+'">'+(tainted?'丢弃':'卖出')+'</button>';

@@ -35,6 +35,16 @@
       <div id="icTraits"></div>
       <div id="icVerdict" class="icverdict"></div>
     </div>
+    <!-- P6 6.3 拍照模式：3:2 取景框，可拖动 -->
+    <div id="photoOverlay">
+      <div id="photoFrame">
+        <span class="pfc tl"></span><span class="pfc tr"></span><span class="pfc bl"></span><span class="pfc br"></span>
+      </div>
+      <div id="photoBar">
+        <button id="photoCancelBtn">取消</button>
+        <button id="shutterBtn">咔嚓 📸</button>
+      </div>
+    </div>
   </div>
 
   <div id="actions">
@@ -42,6 +52,18 @@
     <button class="act" id="hutBtn">🏠 小屋</button>
     <button class="act" id="codexBtn">📖 蘑菇图鉴</button>
     <button class="act" id="achBtn">🏅 成就</button>
+    <button class="act" id="photoBtn">📷 拍照</button>
+  </div>
+</div>
+
+<!-- P6 拍照：快门白闪 + 明信片预览 -->
+<div id="flashOverlay"></div>
+<div id="postcardOverlay">
+  <div id="postcardCard"><img id="postcardImg" alt="明信片"></div>
+  <div id="postcardBar">
+    <a id="postcardSave" download="junzong.png">保存图片</a>
+    <button id="postcardRetake">再拍一张</button>
+    <button id="postcardClose">关闭</button>
   </div>
 </div>
 

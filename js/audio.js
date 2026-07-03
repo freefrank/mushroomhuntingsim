@@ -102,3 +102,13 @@ function sfxDiscover(r){
 function sfxAch(){tone(523,0,0.1,'triangle',0.09);tone(659,0.09,0.1,'triangle',0.09);tone(784,0.18,0.22,'triangle',0.1);}
 /* ====================== P3 猎菇犬：两声短促方波吠声 ====================== */
 function sfxBark(){tone(250,0,0.09,'square',0.09);tone(230,0.13,0.09,'square',0.08);}
+/* ====================== P6 拍照：短促 noise burst + 快门"咔"声 ====================== */
+function sfxShutter(){
+  if(muted||!actx)return;
+  const t=actx.currentTime;
+  const src=actx.createBufferSource();src.buffer=noiseBuf(0.05);
+  const f=actx.createBiquadFilter();f.type='highpass';f.frequency.value=2500;
+  const g=actx.createGain();g.gain.setValueAtTime(0.16,t);g.gain.exponentialRampToValueAtTime(0.0001,t+0.06);
+  src.connect(f);f.connect(g);g.connect(actx.destination);src.start(t);
+  tone(1800,0.03,0.03,'square',0.05);
+}

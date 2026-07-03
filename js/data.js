@@ -189,6 +189,21 @@ const DECAY={default:.25,inky:.75,shaggy:.75,truffle:.10,reishi:.10,woodear:.10,
 const WEATHER_ICON={clear:'☀️',cloud:'⛅',rain:'🌧️',fog:'🌫️',snow:'🌨️',leaf:'🍂',firefly:'✨'};
 const WEATHER_NAME={clear:'晴',cloud:'多云',rain:'有雨',fog:'起雾',snow:'落雪',leaf:'落叶纷飞',firefly:'流萤'};
 
+/* ====================== P6 品质 / 变异 / 拍照 ====================== */
+/* 品质：刷菇时投骰，普通 70% / 肥美 25%（价×1.5，精灵×1.15）/ 极品 5%（价×2.5，精灵×1.3 + 常驻微金闪粒）。
+   概率写在此表，world.js 的 addM() 据此掷骰；c=UI 文案着色（普通不着色）。 */
+const QUALITY={
+  1:{n:'普通',mul:1,c:null},
+  2:{n:'肥美',mul:1.5,c:'#d9852a'},
+  3:{n:'极品',mul:2.5,c:'#d9a02a'},
+};
+const QUALITY_P=[.70,.25,.05]; // 普通/肥美/极品 概率（依次累加判定）
+/* 变异：独立第二投，与品质互不影响。mul 为售价额外倍率；c 为 UI 着色；美术变换见 utils.js variantColor()。 */
+const VARIANTS={
+  albino:{n:'白化',ic:'◇',mul:5,p:.015,c:'#8fd8cf'},
+  gilded:{n:'鎏金',ic:'◆',mul:5,p:.008,c:'#d9a02a'},
+};
+
 /* 非以上六种物种的通用观察文案，由 art / edi 粗略推导 */
 function genericTraits(sp){
   const a=sp.art;

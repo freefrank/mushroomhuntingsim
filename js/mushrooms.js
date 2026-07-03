@@ -1,8 +1,16 @@
 "use strict";
 /* ====================== mushroom painter (painterly vector) ====================== */
-function paintMushroom(sp,SS){
+function paintMushroom(sp,SS,variant){
   SS=SS||3;
-  const a=sp.art;
+  let a=sp.art;
+  if(variant){
+    /* P6 6.2：变异重绘——对色板统一做 HSL 变换后再走原绘制流程，形状/纹理逻辑完全不变 */
+    a=Object.assign({},sp.art);
+    const vc=col=>variantColor(col,variant);
+    for(const k of['cap','cap2','gill','stemC','wartC','scaleC','speckC','umboC','rimC'])
+      if(a[k])a[k]=vc(a[k]);
+    if(a.glow)a.glow=vc(a.glow);
+  }
   const h=a.h, w=a.w||h;
   const padX=w*0.5+(a.glow?h*0.4:0), padT=h*0.32+(a.glow?h*0.4:0);
   const W=(w+padX*2)*SS, H=(h+padT+3)*SS;
@@ -484,7 +492,16 @@ function paintMushroom(sp,SS){
 /* ====================== sprite cache ====================== */
 const SPRITE={};
 SP.forEach(s=>SPRITE[s.id]=paintMushroom(s,3));
-function spriteURL(id){return SPRITE[id].canvas.toDataURL();}
+/* P6 6.2：精灵缓存 key 按变体扩展（':albino'/':gilded' 后缀），懒加载重绘并缓存 */
+function getSprite(id,variant){
+  const key=variant?id+':'+variant:id;
+  if(SPRITE[key])return SPRITE[key];
+  const sp=SPMAP[id];if(!sp)return null;
+  const sr=paintMushroom(sp,3,variant||null);
+  SPRITE[key]=sr;
+  return sr;
+}
+function spriteURL(id,variant){const sr=getSprite(id,variant);return sr?sr.canvas.toDataURL():'';}
 function silhouetteURL(sp){
   const sr=SPRITE[sp.id];const cn=mkCanvas(sr.canvas.width,sr.canvas.height);
   const c=cn.getContext('2d');c.drawImage(sr.canvas,0,0);

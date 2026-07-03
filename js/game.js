@@ -89,8 +89,19 @@ function doPick(){
   const sp=SPMAP[realId];
   m.picked=true;state.picks++;
   if(m.dogMarked&&m.buried)state.flags.dogNose=true; /* P3 成就：鼻子比眼灵 */
-  state.inv.push({id:realId,q:1,fr:1,var:null,day:state.day,tainted:false});
+  const mq=m.q||1,mvar=m.var||null;
+  state.inv.push({id:realId,q:mq,fr:1,var:mvar,day:state.day,tainted:false});
   state.count[realId]=(state.count[realId]||0)+1;
+  /* P6 6.4：图鉴最佳品质/变异记录，不论是否新种、是否拟态，均按真实物种记录 */
+  if(!state.best)state.best={};
+  {
+    const prevBest=state.best[realId]||{q:1,v:{}};
+    state.best[realId]={
+      q:Math.max(prevBest.q||1,mq),
+      v:{albino:!!(prevBest.v&&prevBest.v.albino)||mvar==='albino',
+         gilded:!!(prevBest.v&&prevBest.v.gilded)||mvar==='gilded'},
+    };
+  }
   if(dayClock>=duskEndMs())bumpDayCounter('duskPicks',1); /* P4 成就：月下归人 */
   if(state.weather==='rain')state.flags.rain=true;
   if(sp.sub==='wood'||sp.sub==='stump'||sp.sub==='trunk')state.flags.wood=(state.flags.wood||0)+1;
@@ -117,7 +128,17 @@ function doPick(){
   }
   else sfxPick();
   if(mimicMsg)toast(mimicMsg,isMimic&&!m.inspected?'warn':null);
-  else if(!isNew)toast('🧺 +1 '+sp.n);
+  else if(!isNew){
+    /* P6 6.1/6.2：品质/变异采集提示——变异走小型发现特效（金框 toast + 音效），品质仅着色前缀 */
+    if(mvar&&VARIANTS[mvar]){
+      const vd=VARIANTS[mvar];
+      toast(vd.ic+' 罕见！采到了一株<b style="color:'+vd.c+'">'+vd.n+sp.n+'</b>！','discover');
+      sfxDiscover(1);
+    }else if(mq>=2&&QUALITY[mq]){
+      const qd=QUALITY[mq];
+      toast('🧺 +1 <b style="color:'+qd.c+'">'+qd.n+sp.n+'</b>');
+    }else toast('🧺 +1 '+sp.n);
+  }
   updateHUD();checkAch();refreshHint();save();
 }
 const fx=document.getElementById('fx'),fxCanvas=document.getElementById('fxCanvas'),fxc=fxCanvas.getContext('2d');
@@ -207,6 +228,11 @@ const ACH=[
   {id:'cook1',ic:'🍲',t:'第一口鲜',d:'第一次在灶台做菜',f:s=>s.cooked.length>=1},
   {id:'xiaoren',ic:'👁️',t:'见到小人了',d:'吃到没炒熟的见手青，触发了彩蛋',f:s=>!!s.flags.xiaoren},
   {id:'allrecipe',ic:'🍜',t:'满汉全菌',d:'做过全部 10 道菜',f:s=>s.cooked.length>=RECIPES.length},
+  /* P6 品质 / 变异 / 拍照 */
+  {id:'premium1',ic:'👑',t:'菌中贵族',d:'首株极品蘑菇入包',f:s=>Object.values(s.best||{}).some(b=>b.q>=3)},
+  {id:'albino1',ic:'👻',t:'林间幽灵',d:'采到第一株白化蘑菇',f:s=>Object.values(s.best||{}).some(b=>b.v&&b.v.albino)},
+  {id:'gilded1',ic:'✨',t:'点金手',d:'采到第一株鎏金蘑菇',f:s=>Object.values(s.best||{}).some(b=>b.v&&b.v.gilded)},
+  {id:'photo5',ic:'📷',t:'山林摄影师',d:'拍下 5 张明信片',f:s=>(s.stats.photos||0)>=5},
 ];
 function checkAch(){
   for(const a of ACH){
@@ -303,6 +329,14 @@ function openCodex(){
     card.appendChild(nm);
     const dot=document.createElement('span');dot.className='dot';dot.style.background=RAR[sp.r].c;
     card.appendChild(dot);
+    /* P6 6.4：物种卡角落 ◇白化 / ◆鎏金 小徽记（曾采到过对应变异个体则点亮） */
+    const best=state.best&&state.best[sp.id];
+    if(known&&best&&best.v&&(best.v.albino||best.v.gilded)){
+      const marks=document.createElement('div');marks.className='varmarks';
+      if(best.v.albino){const s=document.createElement('span');s.className='va';s.textContent=VARIANTS.albino.ic;marks.appendChild(s);}
+      if(best.v.gilded){const s=document.createElement('span');s.className='vg';s.textContent=VARIANTS.gilded.ic;marks.appendChild(s);}
+      card.appendChild(marks);
+    }
     if(known)card.onclick=()=>showDetail(sp);
     grid.appendChild(card);
   }
@@ -324,6 +358,15 @@ function showDetail(sp){
     '<div class="eco">'+ecoText(sp)+'　·　季节：'+sp.seasons.map(i=>SEASONS[i].ic).join(' ')+
     '　·　已采集 '+(state.count[sp.id]||0)+' 朵</div>'+
     '<div class="lore">'+sp.lore+'</div>';
+  /* P6 6.4：采过的最佳品质与已遇见的变异 */
+  const best=state.best&&state.best[sp.id];
+  if(best){
+    const qn=QUALITY[best.q]?QUALITY[best.q].n:'普通';
+    const vs=[];
+    if(best.v&&best.v.albino)vs.push(VARIANTS.albino.n+' '+VARIANTS.albino.ic);
+    if(best.v&&best.v.gilded)vs.push(VARIANTS.gilded.n+' '+VARIANTS.gilded.ic);
+    info.innerHTML+='<div class="bestq">采过的最佳品质：<b>'+qn+'</b>'+(vs.length?'　·　已遇见变异：'+vs.join('、'):'')+'</div>';
+  }
   /* P2 2.5 图鉴联动：拟态对互链提示 */
   const partnerId=MIMICS[sp.id]||Object.keys(MIMICS).find(k=>MIMICS[k]===sp.id);
   if(partnerId){
@@ -356,7 +399,8 @@ document.getElementById('resetBtn').onclick=()=>{
   state.coins=0;state.inv=[];state.cap=25;state.day=1;state.orders=[];
   state.tools={};state.buffs={};state.cooked=[];
   xiaorenT=0;xiaorenFigs=[];
-  state.stats={sold:0,earned:0,ordersDone:0,mimicCaught:0,mimicFooled:0};
+  state.stats={sold:0,earned:0,ordersDone:0,mimicCaught:0,mimicFooled:0,photos:0};
+  state.best={};
   save();newField();openAch();updateHUD();toast('进度已重置');
 };
 
@@ -446,6 +490,151 @@ document.getElementById('muteBtn').onclick=function(){muted=!muted;applyMute();t
 document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{
   if(e.target===m||e.target.dataset.close!==undefined)m.classList.remove('show');}));
 
+/* ====================== P6 6.3 拍照模式 ====================== */
+let photoModeActive=false;
+let photoFrameState={x:0,y:0,w:200,h:133};
+function applyFrameStyle(){
+  const el=document.getElementById('photoFrame');
+  el.style.left=photoFrameState.x+'px';el.style.top=photoFrameState.y+'px';
+  el.style.width=photoFrameState.w+'px';el.style.height=photoFrameState.h+'px';
+}
+function openPhotoMode(){
+  if((paused&&!photoModeActive)||inspectCardOpen)return;
+  if(document.querySelector('.modal.show'))return;
+  const st=document.getElementById('stage').getBoundingClientRect();
+  if(!st.width||!st.height)return;
+  if(!photoModeActive){
+    const shortSide=Math.min(st.width,st.height);
+    let fw=shortSide*.7,fh=fw*2/3; /* 3:2 取景框，默认约视口短边 70% */
+    if(fh>st.height*.78){fh=st.height*.78;fw=fh*3/2;}
+    if(fw>st.width*.92){fw=st.width*.92;fh=fw*2/3;}
+    photoFrameState.w=fw;photoFrameState.h=fh;
+    photoFrameState.x=(st.width-fw)/2;photoFrameState.y=(st.height-fh)/2;
+  }
+  applyFrameStyle();
+  paused=true;photoModeActive=true;
+  document.getElementById('postcardOverlay').classList.remove('show');
+  document.getElementById('photoOverlay').classList.add('show');
+}
+function exitPhotoMode(){
+  photoModeActive=false;paused=false;
+  document.getElementById('photoOverlay').classList.remove('show');
+  document.getElementById('postcardOverlay').classList.remove('show');
+}
+/* 取景框拖动：鼠标与触屏通用（pointer events） */
+let frameDrag=null;
+const photoFrameEl=document.getElementById('photoFrame');
+photoFrameEl.addEventListener('pointerdown',e=>{
+  e.preventDefault();
+  const st=document.getElementById('stage').getBoundingClientRect();
+  frameDrag={id:e.pointerId,ox:e.clientX-(st.left+photoFrameState.x),oy:e.clientY-(st.top+photoFrameState.y)};
+  try{photoFrameEl.setPointerCapture(e.pointerId);}catch(err){}
+});
+photoFrameEl.addEventListener('pointermove',e=>{
+  if(!frameDrag||frameDrag.id!==e.pointerId)return;
+  const st=document.getElementById('stage').getBoundingClientRect();
+  let nx=e.clientX-st.left-frameDrag.ox,ny=e.clientY-st.top-frameDrag.oy;
+  nx=Math.max(0,Math.min(st.width-photoFrameState.w,nx));
+  ny=Math.max(0,Math.min(st.height-photoFrameState.h,ny));
+  photoFrameState.x=nx;photoFrameState.y=ny;
+  applyFrameStyle();
+});
+function endFrameDrag(e){if(frameDrag&&frameDrag.id===e.pointerId)frameDrag=null;}
+photoFrameEl.addEventListener('pointerup',endFrameDrag);
+photoFrameEl.addEventListener('pointercancel',endFrameDrag);
+
+function flashScreen(){
+  const el=document.getElementById('flashOverlay');
+  el.classList.remove('flash');void el.offsetWidth;el.classList.add('flash');
+}
+/* 取景框对应的世界坐标范围（用于判断框内是否有已发现物种，做右上小邮票） */
+function framedWorldRect(){
+  const stR=document.getElementById('stage').getBoundingClientRect();
+  const p1=view2world({clientX:stR.left+photoFrameState.x,clientY:stR.top+photoFrameState.y});
+  const p2=view2world({clientX:stR.left+photoFrameState.x+photoFrameState.w,clientY:stR.top+photoFrameState.y+photoFrameState.h});
+  return{x1:Math.min(p1.x,p2.x),y1:Math.min(p1.y,p2.y),x2:Math.max(p1.x,p2.x),y2:Math.max(p1.y,p2.y)};
+}
+function findFramedSpecies(){
+  const r=framedWorldRect();
+  return mushrooms.find(m=>!m.picked&&m.revealed&&m.x>=r.x1&&m.x<=r.x2&&m.y>=r.y1&&m.y<=r.y2&&
+    state.disc.has(m.inspected&&m.trueId?m.trueId:m.id))||null;
+}
+function roundRectPath(c,x,y,w,h,r){
+  c.beginPath();
+  c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);
+  c.closePath();
+}
+/* 左下朱红篆刻风方印「菌踪」：圆角方块底 + 描白字 */
+function drawSeal(c,x,y,size){
+  c.save();
+  c.translate(x,y);
+  const r=size*.12;
+  c.fillStyle='#a8241c';roundRectPath(c,0,0,size,size,r);c.fill();
+  c.strokeStyle='rgba(255,246,223,.55)';c.lineWidth=Math.max(1,size*.025);
+  roundRectPath(c,size*.07,size*.07,size*.86,size*.86,r*.7);c.stroke();
+  c.fillStyle='#f8ece0';c.textAlign='center';c.textBaseline='middle';
+  c.font='700 '+Math.round(size*.34)+'px "Noto Serif SC","Songti SC","SimSun",serif';
+  c.fillText('菌',size/2,size*.32);
+  c.fillText('踪',size/2,size*.7);
+  c.restore();
+}
+/* 咔嚓：离屏合成明信片——场景裁切 + 奶油宽边 + 印章 + 手写体日期行 + 物种小邮票 */
+function composePostcard(){
+  const stR=document.getElementById('stage').getBoundingClientRect();
+  const scaleX=scene.width/stR.width,scaleY=scene.height/stR.height;
+  const sx=Math.round(photoFrameState.x*scaleX),sy=Math.round(photoFrameState.y*scaleY);
+  const sw=Math.max(2,Math.round(photoFrameState.w*scaleX)),sh=Math.max(2,Math.round(photoFrameState.h*scaleY));
+  const photoW=960,photoH=Math.round(photoW*2/3);
+  const border=Math.round(photoW*.06);
+  const bottomExtra=Math.round(photoW*.11);
+  const cardW=photoW+border*2,cardH=photoH+border*2+bottomExtra;
+  const cn=mkCanvas(cardW,cardH),c=cn.getContext('2d');
+  c.fillStyle='#f4ecd8';c.fillRect(0,0,cardW,cardH);
+  c.drawImage(scene,sx,sy,sw,sh,border,border,photoW,photoH);
+  c.strokeStyle='rgba(60,40,20,.35)';c.lineWidth=2;c.strokeRect(border,border,photoW,photoH);
+  const fm=findFramedSpecies();
+  if(fm){
+    const dispId=(fm.inspected&&fm.trueId)?fm.trueId:fm.id;
+    const stampS=Math.round(photoW*.16);
+    const stx=border+photoW-stampS-10,sty=border+10;
+    c.save();
+    c.fillStyle='#fbf6e8';c.fillRect(stx,sty,stampS,stampS);
+    c.setLineDash([4,3]);c.strokeStyle='#8a6a30';c.lineWidth=2;
+    c.strokeRect(stx+3,sty+3,stampS-6,stampS-6);
+    c.setLineDash([]);
+    const spr=getSprite(dispId,null);
+    if(spr){const pad=stampS*.15;c.drawImage(spr.canvas,stx+pad,sty+pad,stampS-pad*2,stampS-pad*2);}
+    c.restore();
+  }
+  const sealSize=Math.round(bottomExtra*.86);
+  drawSeal(c,border,cardH-bottomExtra+(bottomExtra-sealSize)/2,sealSize);
+  c.fillStyle='#4a3a22';
+  c.font='italic 600 '+Math.round(bottomExtra*.28)+'px "Noto Serif SC","Songti SC","SimSun",serif';
+  c.textAlign='right';c.textBaseline='middle';
+  c.fillText('第 '+state.day+' 天 · '+SEASONS[state.season].n+' · '+BIOMES[state.biome].n,cardW-border,cardH-bottomExtra/2);
+  return cn.toDataURL('image/png');
+}
+function shutterPhoto(){
+  sfxShutter();flashScreen();
+  const dataURL=composePostcard();
+  document.getElementById('photoOverlay').classList.remove('show');
+  document.getElementById('postcardImg').src=dataURL;
+  const saveA=document.getElementById('postcardSave');
+  saveA.href=dataURL;saveA.download='junzong_day'+state.day+'.png';
+  document.getElementById('postcardOverlay').classList.add('show');
+  state.stats.photos=(state.stats.photos||0)+1;
+  checkAch();save();
+  return dataURL;
+}
+document.getElementById('photoBtn').addEventListener('click',openPhotoMode);
+document.getElementById('photoCancelBtn').addEventListener('click',exitPhotoMode);
+document.getElementById('postcardClose').addEventListener('click',exitPhotoMode);
+document.getElementById('postcardRetake').addEventListener('click',()=>{
+  document.getElementById('postcardOverlay').classList.remove('show');
+  document.getElementById('photoOverlay').classList.add('show');
+});
+document.getElementById('shutterBtn').addEventListener('pointerdown',e=>{e.preventDefault();shutterPhoto();});
+
 /* ====================== boot ====================== */
 document.getElementById('titleMush').src=paintMushroom(SPMAP['amanita'],6).canvas.toDataURL();
 document.getElementById('startBtn').onclick=async()=>{
@@ -495,4 +684,18 @@ window.__mh={
   triggerXiaoren,
   effCap,
   recipes:()=>RECIPES,
+  /* P6 品质 / 变异 / 拍照 验收钩子 */
+  forceQuality:q=>{setForceQuality(q);},
+  forceVariant:v=>{setForceVariant(v);},
+  photo:()=>{
+    if(!photoModeActive)openPhotoMode();
+    const url=shutterPhoto();
+    return url.length;
+  },
+  best:()=>state.best,
+  quality:()=>QUALITY,
+  variants:()=>VARIANTS,
+  openPhotoMode,
+  exitPhotoMode,
+  photoFrame:()=>photoFrameState,
 };

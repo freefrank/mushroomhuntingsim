@@ -9,8 +9,27 @@ function world2view(x,y){
   const r=scene.getBoundingClientRect();
   return {x:r.left+(x-cam.x)*(r.width/VW),y:r.top+(y-cam.y)*(r.height/VH)};
 }
+/* P6 6.1：极品蘑菇常驻微金闪粒——2-3 个小星点绕伞盖缓慢闪烁，用 tnow（帧率无关的墙钟时间）驱动 */
+function drawQualitySparkle(m,x,y,w,h){
+  if(reduced)return;
+  const n=3;
+  ctx.save();
+  for(let i=0;i<n;i++){
+    const ang=tnow/1300+i*(Math.PI*2/n);
+    const sx=m.x+Math.cos(ang)*w*.3, sy=y+h*.14+Math.sin(ang)*h*.14;
+    const tw=.5+.5*Math.sin(tnow/260+i*2.3);
+    const s2=1.3+.8*tw;
+    ctx.globalAlpha=.32+.5*tw;
+    ctx.fillStyle='#ffe9a0';
+    ctx.beginPath();
+    ctx.moveTo(sx,sy-s2);ctx.lineTo(sx+s2*.32,sy-s2*.32);ctx.lineTo(sx+s2,sy);ctx.lineTo(sx+s2*.32,sy+s2*.32);
+    ctx.lineTo(sx,sy+s2);ctx.lineTo(sx-s2*.32,sy+s2*.32);ctx.lineTo(sx-s2,sy);ctx.lineTo(sx-s2*.32,sy-s2*.32);
+    ctx.closePath();ctx.fill();
+  }
+  ctx.restore();
+}
 function drawMush(m){
-  const sr=SPRITE[m.id];if(!sr)return;
+  const sr=getSprite(m.id,m.var);if(!sr)return;
   const sc=m.scale*(m.pop!=null?Math.min(1,m.pop):1);
   const w=sr.w*sc,h=sr.h*sc;
   const x=m.x-w/2,y=m.y-h+2;
@@ -26,6 +45,7 @@ function drawMush(m){
   if(m.flip){ctx.translate(m.x,0);ctx.scale(-1,1);ctx.translate(-m.x,0);}
   ctx.drawImage(sr.canvas,x,y,w,h);
   ctx.restore();
+  if(m.q===3)drawQualitySparkle(m,x,y,w,h);
   if(m.inspected){
     /* 观察过的蘑菇头顶常驻小徽记：☠ 拟态 / ✓ 安全，随蘑菇位置与镜头移动 */
     const mkx=m.x+w*.34,mky=y+h*.06;
