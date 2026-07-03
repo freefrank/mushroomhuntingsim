@@ -26,6 +26,18 @@ function drawMush(m){
   if(m.flip){ctx.translate(m.x,0);ctx.scale(-1,1);ctx.translate(-m.x,0);}
   ctx.drawImage(sr.canvas,x,y,w,h);
   ctx.restore();
+  if(m.inspected){
+    /* 观察过的蘑菇头顶常驻小徽记：☠ 拟态 / ✓ 安全，随蘑菇位置与镜头移动 */
+    const mkx=m.x+w*.34,mky=y+h*.06;
+    ctx.save();
+    ctx.beginPath();ctx.arc(mkx,mky,7.5,0,7);
+    ctx.fillStyle='#f7ecd2';ctx.fill();
+    ctx.strokeStyle=m.trueId?'rgba(138,20,32,.55)':'rgba(46,125,50,.55)';ctx.lineWidth=1.4;ctx.stroke();
+    ctx.font='bold 10px "Noto Serif SC",serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillStyle=m.trueId?'#8a1420':'#2e7d32';
+    ctx.fillText(m.trueId?'☠':'✓',mkx,mky+.5);
+    ctx.restore();
+  }
   if(m===activeM&&Math.sin(tnow/180)>0){
     ctx.fillStyle='#ffe9a0';
     ctx.beginPath();ctx.arc(m.x,y-8,2.4,0,7);ctx.fill();
@@ -66,14 +78,15 @@ function drawGrassPatch(g){
     ctx.stroke();
   }
 }
-function drawPlayer(){
+function drawPlayer(crouch){
   const p=player;
   const fr=!p.moving?0:(Math.sin(p.phase)>0?1:2);
-  const spr=PLAYER[p.dir][fr];
+  const spr=PLAYER[p.dir][crouch?0:fr];
   ctx.fillStyle='rgba(16,12,6,.28)';
   ctx.beginPath();ctx.ellipse(p.x,p.y+1,13,4.4,0,0,7);ctx.fill();
   ctx.save();ctx.translate(Math.round(p.x),Math.round(p.y));
   if(p.flip)ctx.scale(-1,1);
+  if(crouch){ctx.translate(0,5);ctx.scale(1,.86);} /* 观察时的蹲姿：复用站立帧做挤压变形 */
   ctx.drawImage(spr,-23,-64,46,68);
   ctx.restore();
 }
@@ -221,13 +234,24 @@ function loop(t){
   dtf=Math.min(4,Math.max(.25,lastT?(t-lastT)/16.667:1));lastT=t;
   fpsN++;if(t-fpsT>500){fpsEl.textContent=Math.round(fpsN*1000/(t-fpsT))+' FPS';fpsT=t;fpsN=0;}
   if(paused)return;
+  /* P2 观察：角色停 0.6s（蹲姿）→ 出鉴别卡，此间冻结移动输入 */
+  if(inspectState){
+    inspectState.timer-=16.7*dtf;
+    player.moving=false;
+    if(inspectState.timer<=0){
+      const im=inspectState.m;inspectState=null;
+      if(im&&!im.picked)finishInspect(im);
+    }
+  }
   const p=player;let vx=0,vy=0;const spd=2.9;
-  if(keys.left)vx-=1;if(keys.right)vx+=1;if(keys.up)vy-=1;if(keys.down)vy+=1;
-  if(vx||vy){target=null;pendingPick=null;}
-  if(Math.abs(stickV.x)>.2||Math.abs(stickV.y)>.2){vx=stickV.x;vy=stickV.y;target=null;pendingPick=null;}
-  if(!vx&&!vy&&target){
-    const dx=target.x-p.x,dy=target.y-p.y,d=Math.hypot(dx,dy);
-    if(d>4){vx=dx/d;vy=dy/d;}else target=null;
+  if(!inspectState&&!inspectCardOpen){
+    if(keys.left)vx-=1;if(keys.right)vx+=1;if(keys.up)vy-=1;if(keys.down)vy+=1;
+    if(vx||vy){target=null;pendingPick=null;}
+    if(Math.abs(stickV.x)>.2||Math.abs(stickV.y)>.2){vx=stickV.x;vy=stickV.y;target=null;pendingPick=null;}
+    if(!vx&&!vy&&target){
+      const dx=target.x-p.x,dy=target.y-p.y,d=Math.hypot(dx,dy);
+      if(d>4){vx=dx/d;vy=dy/d;}else target=null;
+    }
   }
   if(vx||vy){
     const d=Math.hypot(vx,vy)||1;p.x+=vx/d*spd*dtf;p.y+=vy/d*spd*dtf;
@@ -275,7 +299,7 @@ function loop(t){
   for(const m of mushrooms)if(!m.picked&&m.x>cam.x-50&&m.x<cam.x+VW+50&&m.y>cam.y-50&&m.y<cam.y+VH+50)ents.push({y:m.y,k:'m',m});
   ents.sort((a,b)=>a.y-b.y);
   for(const e of ents){
-    if(e.k==='p')drawPlayer();
+    if(e.k==='p')drawPlayer(!!inspectState);
     else if(e.k==='d')ctx.drawImage(e.d.s.cn,Math.round(e.d.x-e.d.s.ox),Math.round(e.d.y-e.d.s.oy));
     else if(e.k==='g')drawGrassPatch(e.g);
     else{const m=e.m;if(!m.revealed){if(m.buried)drawMound(m);}else drawMush(m);}
@@ -302,6 +326,10 @@ function positionPrompt(){
   const v=world2view(activeM.x,activeM.y-SPRITE[activeM.id].h*activeM.scale);
   const stR=document.getElementById('stage').getBoundingClientRect();
   promptEl.style.left=(v.x-stR.left)+'px';promptEl.style.top=(v.y-stR.top)+'px';
-  promptEl.innerHTML=(state.disc.has(activeM.id)?SPMAP[activeM.id].n:'？？？')+(FINE_POINTER?' <b>[空格]</b>':'');
+  /* 观察过的拟态显示真身名字；未观察前永远按外观（安全种）判断是否已发现 */
+  const dispId=(activeM.inspected&&activeM.trueId)?activeM.trueId:activeM.id;
+  let txt=state.disc.has(dispId)?SPMAP[dispId].n:'？？？';
+  if(FINE_POINTER)txt+=' <b>[空格]</b> 采集 · <b>[F]</b> 观察';
+  promptEl.innerHTML=txt;
   promptEl.style.display='block';
 }

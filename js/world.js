@@ -525,7 +525,9 @@ function newField(advanceDay){
     const buried=sp.sub==='buried';
     let hidden=buried||inGrass||(sp.r>=3?rg()<.9:sp.r===2?rg()<.72:sp.r===1?rg()<.5:rg()<.25);
     if(state.weather==='fog'&&sp.r>=1)hidden=hidden||rg()<.4;
-    mushrooms.push({id:sp.id,x,y,picked:false,hidden,buried,inGrass:!!inGrass,
+    /* P2 拟态：安全种 18% 概率实际是危险拟态个体，外观仍完全用安全种精灵渲染（m.id 不变），真实身份存 m.trueId */
+    const trueId=(MIMICS[sp.id]&&rg()<.18)?MIMICS[sp.id]:null;
+    mushrooms.push({id:sp.id,trueId,inspected:false,x,y,picked:false,hidden,buried,inGrass:!!inGrass,
       revealed:!hidden,pop:hidden?0:1,scale:rf(rg,1,1.3),flip:rg()<.5});
   }
   const trees=decos.filter(d=>d.kind==='tree');
@@ -605,9 +607,9 @@ function newField(advanceDay){
       if(sp&&sp.sub!=='wood'&&sp.sub!=='trunk')
         addM(sp,rint(rg,50,WW-50),rint(rg,50,WH-30),false);
     }
-    // guarantee an undiscovered species appears sometimes
+    // guarantee an undiscovered species appears sometimes（拟态个体不计入此逻辑，P2 2.2）
     const undisc=pool.filter(s=>!state.disc.has(s.id));
-    if(undisc.length&&!mushrooms.some(m=>!state.disc.has(m.id))){
+    if(undisc.length&&!mushrooms.some(m=>!m.trueId&&!state.disc.has(m.id))){
       const sp=pick(rg,undisc);
       spawnCluster(sp);
     }
@@ -617,5 +619,20 @@ function newField(advanceDay){
   cam.y=Math.max(0,Math.min(WH-VH,player.y-VH/2));
   state.visited.add(state.biome);
   ensureOrders();
+  if(typeof inspectState!=='undefined'&&inspectState)inspectState=null;
+  if(typeof closeInspectCard==='function')closeInspectCard();
   updateHUD();refreshHint();checkAch();save();
+}
+
+/* ====================== P2 验收钩子：玩家旁强制刷一株拟态 ====================== */
+function spawnMimic(safeId){
+  const sp=SPMAP[safeId];
+  if(!sp||!MIMICS[safeId])return null;
+  const a=Math.random()*6.28;
+  const x=Math.max(26,Math.min(WW-26,player.x+Math.cos(a)*60));
+  const y=Math.max(40,Math.min(WH-16,player.y+Math.sin(a)*60));
+  const m={id:safeId,trueId:MIMICS[safeId],inspected:false,x,y,picked:false,hidden:false,buried:false,
+    inGrass:false,revealed:true,pop:1,scale:1.1,flip:false};
+  mushrooms.push(m);
+  return m;
 }

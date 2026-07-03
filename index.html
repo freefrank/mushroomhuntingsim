@@ -28,7 +28,13 @@
     <div id="toasts"></div>
     <div id="fps"></div>
     <div id="stick"><div id="knob"></div></div>
+    <button id="inspectBtn">👁 观察</button>
     <button id="pickBtn">采集</button>
+    <div id="inspectCard">
+      <div class="ichead"><b id="icTitle">观察记录</b><div class="grow"></div><button class="xbtn" id="icClose">✕</button></div>
+      <div id="icTraits"></div>
+      <div id="icVerdict" class="icverdict"></div>
+    </div>
   </div>
 
   <div id="actions">
@@ -81,6 +87,7 @@
       <div class="huthead">
         <span>🧺 背包 <b id="hutInvN">0</b> / <span id="hutCapN">25</span></span>
         <div class="grow"></div>
+        <button class="sellallbtn" id="discardTaintedBtn" style="display:none;background:linear-gradient(180deg,#d9756a,#a04030);color:#fff5f0">🗑 丢弃污染菇</button>
         <button class="sellallbtn" id="sellAllBtn">一键全卖</button>
       </div>
       <div class="sellist" id="sellList"></div>

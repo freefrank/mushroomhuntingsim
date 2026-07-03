@@ -158,3 +158,38 @@ const SP=[
 ];
 const SPMAP={};SP.forEach(s=>SPMAP[s.id]=s);
 const TOTAL=SP.length;
+
+/* ====================== P2 拟态 / 鉴别 ====================== */
+/* 安全种 -> 危险拟态。拟态个体生成时外观完全沿用安全种精灵渲染，真实身份存于 m.trueId */
+const MIMICS={button:'angel',straw:'deathcap',morel:'gyromitra'};
+/* 六个相关物种的手写鉴别特征（菌褶颜色 / 菌环菌托 / 气味） */
+const INSPECT_TRAITS={
+  button:   {gill:'菌褶粉褐色，随成熟逐渐加深',   ring:'菌柄基部无菌托，仅有细微菌环痕迹',           smell:'气味温和，带松软菇香'},
+  angel:    {gill:'菌褶纯白色，成熟后依旧洁白',   ring:'菌柄基部裹着明显的白色膜质菌托，柄上部有菌环', smell:'气味清淡略甜，不甚刺鼻'},
+  straw:    {gill:'菌褶粉褐色，成熟后转为深褐',   ring:'菌柄基部包裹灰褐色苞状菌托，柄上无菌环',       smell:'带谷物般的清甜香气'},
+  deathcap: {gill:'菌褶纯白色，从不随成熟转色',   ring:'菌柄基部有肥厚的白色菌托，柄上部另有菌环',     smell:'初闻微甜，放久竟转腐臭'},
+  morel:    {gill:'无菌褶，伞面呈规则蜂窝状凹坑', ring:'菌柄中空、表面光滑，基部无菌托',               smell:'清新的坚果与泥土香气'},
+  gyromitra:{gill:'无菌褶，伞面呈不规则脑状皱褶', ring:'菌柄内部呈棉絮状，基部同样无菌托',             smell:'带轻微酸涩刺激气味，久闻微呛'},
+};
+/* 拟态个体与安全种相异、需要标红警示对照的特征字段（每对 1-2 条） */
+const MIMIC_WARN_FIELDS={angel:['gill','ring'],deathcap:['gill','smell'],gyromitra:['gill','smell']};
+/* 图鉴详情页互链提示文案 */
+const MIMIC_TIPS={
+  button:'留意菌褶颜色——纯白菌褶加基部菌托，是危险的信号。',
+  angel:'留意菌褶颜色——纯白菌褶加基部菌托，是危险的信号。',
+  straw:'留意基部菌托——草菇菌托薄软无环，毒鹅膏菌托肥厚且柄上另有菌环。',
+  deathcap:'留意基部菌托——草菇菌托薄软无环，毒鹅膏菌托肥厚且柄上另有菌环。',
+  morel:'留意伞面纹理——羊肚菌是规则蜂窝状凹坑，鹿花菌是不规则脑状皱褶。',
+  gyromitra:'留意伞面纹理——羊肚菌是规则蜂窝状凹坑，鹿花菌是不规则脑状皱褶。',
+};
+/* 非以上六种物种的通用观察文案，由 art / edi 粗略推导 */
+function genericTraits(sp){
+  const a=sp.art;
+  const gill=a.gill?'菌褶细密，颜色因品种而异':
+    (a.shape==='puff'||a.shape==='truffle')?'内部近乎实心，无明显菌褶':
+    (a.shape==='shelf')?'背面呈细密孔口状，无菌褶':'菌褶结构不甚明显';
+  const ring=a.ring?'菌柄上部可见菌环':a.volva?'菌柄基部有菌托包裹':'菌柄光滑，无环无托';
+  const smell=(sp.edi==='deadly'||sp.edi==='poison')?'气味平淡甚至略带异味，不可掉以轻心':
+    sp.edi==='med'?'气味清苦，带草药气息':'气味自然，带泥土与菌菇的清香';
+  return {gill,ring,smell};
+}

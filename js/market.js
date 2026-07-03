@@ -68,54 +68,77 @@ function ensureOrders(){
 /* ---------- 出售页签 ---------- */
 function stackInv(){
   const map={};
-  for(const it of state.inv)(map[it.id]=map[it.id]||[]).push(it);
+  for(const it of state.inv){
+    const key=it.id+(it.tainted?'#t':'');
+    (map[key]=map[key]||[]).push(it);
+  }
   return map;
 }
+/* tainted（被拟态污染）物品售价恒为 0，P2 2.4 */
+function itemPrice(it){return it.tainted?0:priceOf(it.id,it.q,it.fr);}
 function renderSellList(){
   const capEl=document.getElementById('hutCapN'),invEl=document.getElementById('hutInvN');
   if(invEl)invEl.textContent=state.inv.length;
   if(capEl)capEl.textContent=state.cap;
   const wrap=document.getElementById('sellList');if(!wrap)return;
   wrap.innerHTML='';
+  const discardBtn=document.getElementById('discardTaintedBtn');
+  if(discardBtn)discardBtn.style.display=state.inv.some(it=>it.tainted)?'inline-block':'none';
   if(!state.inv.length){
     wrap.innerHTML='<div class="emptytip">竹篮空空——去林子里采些蘑菇再来吧。</div>';
     return;
   }
   const map=stackInv();
-  const ids=Object.keys(map).sort((a,b)=>SPMAP[b].r-SPMAP[a].r);
-  for(const id of ids){
-    const sp=SPMAP[id],items=map[id],n=items.length,unit=priceOf(id),total=unit*n;
+  const keys=Object.keys(map).sort((a,b)=>{
+    const idA=a.split('#')[0],idB=b.split('#')[0];
+    return SPMAP[idB].r-SPMAP[idA].r;
+  });
+  for(const key of keys){
+    const tainted=key.endsWith('#t');
+    const id=tainted?key.slice(0,-2):key;
+    const sp=SPMAP[id],items=map[key],n=items.length;
+    const unit=tainted?0:priceOf(id),total=unit*n;
     const pf=priceFactor(id);
-    const arrow=pf>=1.15?'<span class="pf up">↑</span>':pf<=.9?'<span class="pf down">↓</span>':'';
-    const pharm=(sp.edi==='poison'||sp.edi==='deadly')?' <span class="pharm">⚗ 药铺收购</span>':'';
-    const row=document.createElement('div');row.className='sellrow';
+    const arrow=(!tainted&&pf>=1.15)?'<span class="pf up">↑</span>':(!tainted&&pf<=.9)?'<span class="pf down">↓</span>':'';
+    const pharm=(!tainted&&(sp.edi==='poison'||sp.edi==='deadly'))?' <span class="pharm">⚗ 药铺收购</span>':'';
+    const taintedTag=tainted?' <span class="taintedtag">已污染</span>':'';
+    const row=document.createElement('div');row.className='sellrow'+(tainted?' tainted':'');
     row.innerHTML='<img src="'+spriteURL(id)+'" alt="">'+
-      '<div class="sinfo"><div class="sname">'+sp.n+arrow+pharm+'</div>'+
+      '<div class="sinfo"><div class="sname">'+sp.n+arrow+pharm+taintedTag+'</div>'+
       '<div class="sunit">单价 '+unit+' 🪙 × '+n+'</div></div>'+
       '<div class="stotal">'+total+' 🪙</div>'+
-      '<button class="sellbtn" data-id="'+id+'">卖出</button>';
+      '<button class="sellbtn" data-id="'+id+'" data-tainted="'+(tainted?'1':'0')+'">'+(tainted?'丢弃':'卖出')+'</button>';
     wrap.appendChild(row);
   }
-  wrap.querySelectorAll('.sellbtn').forEach(b=>b.addEventListener('click',()=>sellStack(b.dataset.id)));
+  wrap.querySelectorAll('.sellbtn').forEach(b=>b.addEventListener('click',()=>sellStack(b.dataset.id,b.dataset.tainted==='1')));
 }
-function sellStack(id){
-  const items=state.inv.filter(it=>it.id===id);
+function sellStack(id,tainted){
+  const items=state.inv.filter(it=>it.id===id&&!!it.tainted===!!tainted);
   if(!items.length)return;
-  let earned=0;for(const it of items)earned+=priceOf(it.id,it.q,it.fr);
-  state.inv=state.inv.filter(it=>it.id!==id);
+  let earned=0;if(!tainted)for(const it of items)earned+=itemPrice(it);
+  state.inv=state.inv.filter(it=>!(it.id===id&&!!it.tainted===!!tainted));
   state.coins+=earned;state.stats.sold+=items.length;state.stats.earned+=earned;
-  toast('🪙 +'+earned+' 售出 '+items.length+' 朵 '+SPMAP[id].n);
+  toast(tainted?'🗑 丢弃了 '+items.length+' 朵已污染的'+SPMAP[id].n:'🪙 +'+earned+' 售出 '+items.length+' 朵 '+SPMAP[id].n);
   updateHUD();checkAch();save();
   renderSellList();
 }
 function sellAll(){
   if(!state.inv.length){toast('篮子空空如也');return;}
   let earned=0;const count=state.inv.length;
-  for(const it of state.inv)earned+=priceOf(it.id,it.q,it.fr);
+  for(const it of state.inv)earned+=itemPrice(it);
   state.inv=[];
   state.coins+=earned;state.stats.sold+=count;state.stats.earned+=earned;
   toast('🪙 +'+earned+' 一键卖出 '+count+' 朵');
   updateHUD();checkAch();save();
+  renderSellList();
+}
+/* 一键丢弃背包里所有已污染的蘑菇（P2 2.4） */
+function discardTainted(){
+  const n=state.inv.filter(it=>it.tainted).length;
+  if(!n){toast('没有已污染的蘑菇');return;}
+  state.inv=state.inv.filter(it=>!it.tainted);
+  toast('🗑 丢弃了 '+n+' 朵已污染的蘑菇');
+  updateHUD();save();
   renderSellList();
 }
 
@@ -126,7 +149,7 @@ function renderOrderList(){
   wrap.innerHTML='';
   state.orders.forEach((o,i)=>{
     const sp=SPMAP[o.spId];if(!sp)return;
-    const have=state.inv.filter(it=>it.id===o.spId).length;
+    const have=state.inv.filter(it=>it.id===o.spId&&!it.tainted).length;
     const ok=have>=o.qty;
     const row=document.createElement('div');row.className='orow';
     row.innerHTML='<div class="onpc">'+o.npc+'</div>'+
@@ -140,11 +163,11 @@ function renderOrderList(){
 }
 function deliver(i){
   const o=state.orders[i];if(!o)return;
-  const have=state.inv.filter(it=>it.id===o.spId);
+  const have=state.inv.filter(it=>it.id===o.spId&&!it.tainted);
   if(have.length<o.qty){toast('还差 '+(o.qty-have.length)+' 朵，凑够了再来吧');return;}
   let removed=0;
   state.inv=state.inv.filter(it=>{
-    if(it.id===o.spId&&removed<o.qty){removed++;return false;}
+    if(it.id===o.spId&&!it.tainted&&removed<o.qty){removed++;return false;}
     return true;
   });
   state.coins+=o.reward;state.stats.ordersDone++;
@@ -172,4 +195,5 @@ function openHut(){
 }
 document.getElementById('hutBtn').addEventListener('click',openHut);
 document.getElementById('sellAllBtn').addEventListener('click',sellAll);
+document.getElementById('discardTaintedBtn').addEventListener('click',discardTainted);
 document.querySelectorAll('#hutTabs button').forEach(b=>b.addEventListener('click',()=>setHutTab(b.dataset.tab)));

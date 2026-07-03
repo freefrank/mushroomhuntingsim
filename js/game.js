@@ -5,6 +5,72 @@ function toast(msg,cls){
   document.getElementById('toasts').appendChild(t);
   setTimeout(()=>t.remove(),2600);
 }
+/* ====================== P2 观察 / 鉴别 ====================== */
+let inspectState=null;      // {m,timer} 观察蹲下等待中
+let inspectCardOpen=false;  // 鉴别卡是否展开
+function shakeStage(){
+  const el=document.getElementById('stage');
+  el.classList.remove('shake');void el.offsetWidth;el.classList.add('shake');
+  setTimeout(()=>el.classList.remove('shake'),420);
+}
+const EDI_TAINTABLE=new Set(['edible','careful','med']);
+function taintRandomItems(n){
+  const eligible=state.inv.filter(it=>!it.tainted&&EDI_TAINTABLE.has(SPMAP[it.id].edi));
+  let tainted=0;
+  for(let i=0;i<n&&eligible.length;i++){
+    const idx=Math.floor(Math.random()*eligible.length);
+    eligible[idx].tainted=true;tainted++;
+    eligible.splice(idx,1);
+  }
+  return tainted;
+}
+function buildInspectData(m){
+  const dispSp=SPMAP[m.id];                 // 外观（安全种）
+  const isMimic=!!m.trueId;
+  const realId=isMimic?m.trueId:m.id;
+  const realSp=SPMAP[realId];
+  const realTraits=INSPECT_TRAITS[realId]||genericTraits(realSp);
+  const warnFields=isMimic?(MIMIC_WARN_FIELDS[realId]||['gill','ring']):[];
+  const safeTraits=isMimic?(INSPECT_TRAITS[dispSp.id]||genericTraits(dispSp)):null;
+  const labels={gill:'菌褶颜色',ring:'菌环/菌托',smell:'气味'};
+  const rows=['gill','ring','smell'].map(k=>{
+    const warn=warnFields.includes(k);
+    return {key:k,label:labels[k],text:realTraits[k],warn,
+      note:warn?('⚠ '+dispSp.n+'应为：'+safeTraits[k]):null};
+  });
+  const verdict=isMimic?('⚠ 这不是'+dispSp.n+'——是'+realSp.n+'！'):'✓ 特征相符，可以放心采';
+  return {m,dispSp,realSp,isMimic,rows,verdict};
+}
+function renderInspectCard(data){
+  document.getElementById('icTitle').textContent='🔍 '+data.dispSp.n+' 观察记录';
+  document.getElementById('icTraits').innerHTML=data.rows.map(r=>
+    '<div class="ictrait'+(r.warn?' warn':'')+'"><span class="ick">'+r.label+'</span><span class="icv">'+r.text+'</span>'+
+    (r.note?'<div class="icnote">'+r.note+'</div>':'')+'</div>'
+  ).join('');
+  const vEl=document.getElementById('icVerdict');
+  vEl.className='icverdict'+(data.isMimic?' bad':' good');
+  vEl.textContent=data.verdict;
+  document.getElementById('inspectCard').classList.add('show');
+  inspectCardOpen=true;
+}
+function finishInspect(m){
+  m.inspected=true;
+  const data=buildInspectData(m);
+  renderInspectCard(data);
+  updateHUD();save();
+  return data;
+}
+function closeInspectCard(){
+  const card=document.getElementById('inspectCard');
+  if(card)card.classList.remove('show');
+  inspectCardOpen=false;
+}
+function startInspect(m){
+  if(!m||paused||inspectState||inspectCardOpen||m.picked)return;
+  target=null;pendingPick=null;
+  inspectState={m,timer:600};
+}
+
 function ecoText(sp){
   let s='生长于'+SUBTXT[sp.sub];
   if(sp.host)s+='，与'+HOSTTXT[sp.host]+'相伴';
@@ -13,23 +79,41 @@ function ecoText(sp){
   return s;
 }
 function doPick(){
-  if(!activeM||paused)return;
+  if(!activeM||paused||inspectState||inspectCardOpen)return;
   if(state.inv.length>=state.cap){toast('🧺 篮子满了，去小屋卖掉些吧');return;}
-  const m=activeM,sp=SPMAP[m.id];
+  const m=activeM;
+  const isMimic=!!m.trueId;
+  const realId=isMimic?m.trueId:m.id;
+  const sp=SPMAP[realId];
   m.picked=true;state.picks++;
-  state.inv.push({id:sp.id,q:1,fr:1,var:null,day:state.day});
-  state.count[m.id]=(state.count[m.id]||0)+1;
+  state.inv.push({id:realId,q:1,fr:1,var:null,day:state.day,tainted:false});
+  state.count[realId]=(state.count[realId]||0)+1;
   if(state.weather==='rain')state.flags.rain=true;
   if(sp.sub==='wood'||sp.sub==='stump'||sp.sub==='trunk')state.flags.wood=(state.flags.wood||0)+1;
   if(sp.sub==='ring')state.flags.ring=true;
   puff(m.x,m.y,RAR[sp.r].c,12+sp.r*5);
-  const isNew=!state.disc.has(m.id);
+  /* P2 拟态后果：识破采集入危险种 vs 未观察误采触发污染 */
+  let mimicMsg=null;
+  if(isMimic){
+    if(m.inspected){
+      state.stats.mimicCaught=(state.stats.mimicCaught||0)+1;
+      mimicMsg='🧤 戴上手套，小心地采下了这朵'+sp.n+'……';
+    }else{
+      state.stats.mimicFooled=(state.stats.mimicFooled||0)+1;
+      const nTaint=taintRandomItems(3);
+      shakeStage();
+      mimicMsg='⚠ 手一滑才发现是'+sp.n+'！篮里 '+(nTaint||3)+' 朵菇被毒液沾染了…';
+    }
+  }
+  const isNew=!state.disc.has(realId);
   if(isNew){
-    state.disc.add(m.id);
+    state.disc.add(realId);
     if(state.season===3)state.flags.winterDisc=(state.flags.winterDisc||0)+1;
     discovery(sp);
   }
-  else{sfxPick();toast('🧺 +1 '+sp.n);}
+  else sfxPick();
+  if(mimicMsg)toast(mimicMsg,isMimic&&!m.inspected?'warn':null);
+  else if(!isNew)toast('🧺 +1 '+sp.n);
   updateHUD();checkAch();refreshHint();save();
 }
 const fx=document.getElementById('fx'),fxCanvas=document.getElementById('fxCanvas'),fxc=fxCanvas.getContext('2d');
@@ -105,6 +189,9 @@ const ACH=[
   {id:'biz1',ic:'💰',t:'首笔生意',d:'第一次在小屋卖出蘑菇',f:s=>s.stats.sold>=1},
   {id:'biz500',ic:'🪙',t:'小有积蓄',d:'累计赚得 500 金币',f:s=>s.stats.earned>=500},
   {id:'biz10',ic:'🏆',t:'金字招牌',d:'完成 10 单委托',f:s=>s.stats.ordersDone>=10},
+  {id:'mimic1',ic:'👁️',t:'火眼金睛',d:'第一次识破拟态并成功采下',f:s=>(s.stats.mimicCaught||0)>=1},
+  {id:'mimicfooled',ic:'🩹',t:'学费',d:'第一次被相似种坑了一把',f:s=>(s.stats.mimicFooled||0)>=1},
+  {id:'mimic10',ic:'🕵️',t:'鉴菇师',d:'累计识破拟态 10 次',f:s=>(s.stats.mimicCaught||0)>=10},
 ];
 function checkAch(){
   for(const a of ACH){
@@ -222,8 +309,20 @@ function showDetail(sp){
     '<div class="eco">'+ecoText(sp)+'　·　季节：'+sp.seasons.map(i=>SEASONS[i].ic).join(' ')+
     '　·　已采集 '+(state.count[sp.id]||0)+' 朵</div>'+
     '<div class="lore">'+sp.lore+'</div>';
+  /* P2 2.5 图鉴联动：拟态对互链提示 */
+  const partnerId=MIMICS[sp.id]||Object.keys(MIMICS).find(k=>MIMICS[k]===sp.id);
+  if(partnerId){
+    const known=state.disc.has(partnerId);
+    const partnerName=known?SPMAP[partnerId].n:'？？？';
+    info.innerHTML+='<div class="mimicwarn">⚠ 极易与〈<a href="#" class="mimiclink" data-id="'+partnerId+'">'+partnerName+'</a>〉混淆——鉴别要点：'+(MIMIC_TIPS[sp.id]||'外观几乎一致，采集前请仔细观察再下手。')+'</div>';
+  }
   d.appendChild(info);
   d.style.display='flex';
+  d.querySelectorAll('.mimiclink').forEach(a=>a.addEventListener('click',e=>{
+    e.preventDefault();
+    if(state.disc.has(a.dataset.id))showDetail(SPMAP[a.dataset.id]);
+    else toast('这个物种还没被发现过');
+  }));
 }
 function openAch(){
   const list=document.getElementById('achList');list.innerHTML='';
@@ -254,7 +353,8 @@ addEventListener('keydown',e=>{
   if(k==='a'||k==='arrowleft')keys.left=true;
   if(k==='d'||k==='arrowright')keys.right=true;
   if(k===' '||k==='e'){e.preventDefault();if(fx.classList.contains('show'))document.getElementById('fxGo').click();else doPick();}
-  if(e.key==='Escape')document.querySelectorAll('.modal.show').forEach(m=>m.classList.remove('show'));
+  if(k==='f'){e.preventDefault();if(inspectCardOpen)closeInspectCard();else startInspect(activeM);}
+  if(e.key==='Escape'){document.querySelectorAll('.modal.show').forEach(m=>m.classList.remove('show'));if(inspectCardOpen)closeInspectCard();}
 });
 addEventListener('keyup',e=>{
   const k=e.key.toLowerCase();
@@ -277,6 +377,12 @@ function stickMove(e){
   knob.style.transform='translate(calc(-50% + '+(dx*24)+'px),calc(-50% + '+(dy*24)+'px))';
 }
 document.getElementById('pickBtn').addEventListener('pointerdown',e=>{e.preventDefault();doPick();});
+/* P2 触屏「👁 观察」钮：粗指针设备在 #pickBtn 上方出现（CSS 控制显隐） */
+document.getElementById('inspectBtn').addEventListener('pointerdown',e=>{e.preventDefault();startInspect(activeM);});
+document.getElementById('icClose').addEventListener('click',e=>{e.stopPropagation();closeInspectCard();});
+document.addEventListener('pointerdown',e=>{
+  if(inspectCardOpen&&!e.target.closest('#inspectCard')&&e.target.id!=='inspectBtn')closeInspectCard();
+});
 /* 全鼠标/触屏操控：点地面走过去，按住拖动持续移动，点蘑菇自动走近并采集 */
 let scenePointerId=null;
 function clampTarget(w){
@@ -339,4 +445,15 @@ window.__mh={
   openHut,
   deliver,
   priceOf,
+  /* P2 鉴别 / 相似种 验收钩子 */
+  mimics:()=>MIMICS,
+  spawnMimic,
+  inspect:()=>{
+    if(!activeM)return null;
+    activeM.inspected=true;
+    const data=buildInspectData(activeM);
+    renderInspectCard(data);
+    updateHUD();save();
+    return data;
+  },
 };

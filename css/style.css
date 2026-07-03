@@ -59,6 +59,7 @@
     padding:5px 15px;font-size:15px;color:var(--cream);animation:tpop 2.6s forwards;
     box-shadow:0 4px 14px rgba(0,0,0,.4)}
   .toast.ach{border-color:#7fc47f;color:#e2f2da}
+  .toast.warn{border-color:#d9756a;color:#f8dcd6;background:rgba(90,26,16,.92)}
   @keyframes tpop{0%{opacity:0;transform:translateY(10px)}8%{opacity:1;transform:none}
     80%{opacity:1}100%{opacity:0;transform:translateY(-10px)}}
 
@@ -79,6 +80,42 @@
     font-size:13px;color:#b9ab88;z-index:4;pointer-events:none;font-variant-numeric:tabular-nums}
   @media (hover:hover) and (pointer:fine){ #fps{bottom:12px} }
   @media (hover:hover) and (pointer:fine){ #stick{display:none} }
+
+  /* ---------- P2 观察 / 鉴别 ---------- */
+  #inspectBtn{position:absolute;right:26px;bottom:104px;width:60px;height:60px;border-radius:50%;z-index:5;
+    font-family:inherit;font-weight:700;font-size:13px;color:#31230a;cursor:pointer;
+    background:radial-gradient(circle at 36% 28%, #f2d488, #d9a441 62%, #b9832a);
+    border:2px solid #6b511a;box-shadow:0 6px 14px rgba(0,0,0,.5), 0 0 18px rgba(217,164,65,.25)}
+  #inspectBtn:active{transform:translateY(3px)}
+  @media (hover:hover) and (pointer:fine){ #inspectBtn{display:none} }
+
+  #inspectCard{position:absolute;left:50%;bottom:14%;transform:translateX(-50%);
+    width:min(92vw,380px);max-height:60%;overflow:auto;display:none;z-index:8;
+    background:linear-gradient(180deg,#f6efdd,#eadfc2);color:var(--ink);
+    border:1px solid #9a7f4a;border-radius:16px;padding:14px 16px;
+    box-shadow:0 18px 40px rgba(0,0,0,.55), inset 0 0 0 3px rgba(154,127,74,.16)}
+  #inspectCard.show{display:block;animation:icpop .22s ease-out}
+  @keyframes icpop{from{opacity:0;transform:translateX(-50%) translateY(10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+  .ichead{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .ichead b{font-size:16px;color:#4a3416}
+  .ictrait{background:#fbf6e8;border:1px solid #c9b183;border-radius:10px;
+    padding:7px 11px;margin-bottom:6px;font-size:14px;display:flex;gap:8px;flex-wrap:wrap}
+  .ictrait .ick{color:#8a7350;font-weight:700;flex:none;min-width:64px}
+  .ictrait .icv{color:#3d2f1a}
+  .ictrait.warn{border-color:#c96a5a;background:#fbe9e4}
+  .ictrait.warn .icv{color:#a04030;font-weight:700}
+  .icnote{flex-basis:100%;font-size:12.5px;color:#a04030;margin-top:2px}
+  .icverdict{margin-top:8px;font-size:15px;font-weight:700;text-align:center;
+    border-radius:10px;padding:8px 10px}
+  .icverdict.good{background:#ddefd8;color:#2e7d32}
+  .icverdict.bad{background:#f4dcd6;color:#8a1420}
+
+  #stage.shake{animation:stageshake .42s ease-in-out}
+  @keyframes stageshake{
+    0%,100%{transform:translate(0,0)}10%{transform:translate(-6px,2px)}20%{transform:translate(5px,-3px)}
+    30%{transform:translate(-4px,3px)}40%{transform:translate(6px,1px)}50%{transform:translate(-5px,-2px)}
+    60%{transform:translate(4px,2px)}70%{transform:translate(-3px,-1px)}80%{transform:translate(2px,1px)}90%{transform:translate(-1px,0)}
+  }
 
   /* ---------- bottom bar ---------- */
   #actions{display:flex;gap:10px}
@@ -165,6 +202,11 @@
   .pf.down{color:#2e7d32}
   .pharm{font-size:12px;color:#7a4fa0}
   .emptytip{padding:24px 10px;text-align:center;color:#8a7350;font-size:14.5px;line-height:1.7}
+  .sellrow.tainted{opacity:.6;filter:grayscale(.65)}
+  .taintedtag{font-size:12px;color:#a04030;font-weight:400}
+  .mimicwarn{margin-top:8px;font-size:13.5px;color:#a04030;background:#fbe9e4;
+    border:1px solid #d9a89c;border-radius:10px;padding:8px 11px;line-height:1.6}
+  .mimiclink{color:#7a2418;text-decoration:underline;font-weight:700;cursor:pointer}
   .orow{background:#fbf6e8;border:1px solid #c9b183;border-radius:12px;padding:10px 13px}
   .onpc{font-size:14px;color:#5a4526;line-height:1.5;margin-bottom:7px}
   .oline{display:flex;align-items:center;gap:8px;margin-bottom:7px}

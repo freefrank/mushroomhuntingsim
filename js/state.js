@@ -50,7 +50,7 @@ async function load(){
     /* v2+ 字段：旧档（无 v，或字段缺失）一律给默认值，旧的数字 basket 直接丢弃 */
     state.coins=typeof d.coins==='number'&&d.coins>=0?d.coins:0;
     state.inv=Array.isArray(d.inv)?d.inv.filter(it=>it&&SPMAP[it.id]).map(it=>({
-      id:it.id,q:it.q||1,fr:it.fr==null?1:it.fr,var:it.var||null,day:it.day||d.day||1})):[];
+      id:it.id,q:it.q||1,fr:it.fr==null?1:it.fr,var:it.var||null,day:it.day||d.day||1,tainted:!!it.tainted})):[];
     state.cap=typeof d.cap==='number'&&d.cap>0?d.cap:25;
     state.day=typeof d.day==='number'&&d.day>0?d.day:1;
     state.orders=Array.isArray(d.orders)?d.orders.filter(o=>o&&SPMAP[o.spId]):[];
