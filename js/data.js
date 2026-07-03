@@ -16,15 +16,18 @@ const EDI={
   deadly:{t:'剧毒',c:'#8a1420',b:'#f0ccc8'},
   med:{t:'药用',c:'#7a4fa0',b:'#e9def4'},
 };
+/* E2.2 解锁门槛重排（按 100 种收集体量的规划值，E3 内容上线前先按当前 40 种手感验证不卡关） */
 const BIOMES={
   forest:{n:'阔叶林',ic:'🌳',req:0,desc:'栎树与桦树的领地，枯木上藏着惊喜'},
   meadow:{n:'草甸',ic:'🌾',req:0,desc:'开阔草地，雨后会冒出蘑菇圈'},
   pine:{n:'松针林',ic:'🌲',req:6,desc:'松脂香里埋着秋日的珍宝'},
-  wetland:{n:'溪谷湿地',ic:'💧',req:12,desc:'潮湿幽暗，美丽与危险并存'},
-  grove:{n:'灵境秘林',ic:'✨',req:20,desc:'暮色永驻的魔法林地'},
+  wetland:{n:'溪谷湿地',ic:'💧',req:14,desc:'潮湿幽暗，美丽与危险并存'},
+  bamboo:{n:'竹林幽径',ic:'🎋',req:22,desc:'翠竹疏影，湿润清幽，竹叶终年不落'},
+  grove:{n:'灵境秘林',ic:'✨',req:32,desc:'暮色永驻的魔法林地'},
+  alpine:{n:'高山苔甸',ic:'🏔',req:44,desc:'苔草覆石，碎雪不化，珍稀之物藏在最冷处'},
 };
 const SUBTXT={ground:'林地腐殖土',wood:'倒木、朽木上',stump:'树桩及其周围',trunk:'活树树干基部',grass:'草地、草丛间',ring:'开阔草地（常成蘑菇圈）',buried:'埋于地下，需循迹寻掘'};
-const HOSTTXT={oak:'栎树（橡树）',birch:'桦树',pine:'松树',willow:'柳树'};
+const HOSTTXT={oak:'栎树（橡树）',birch:'桦树',pine:'松树',willow:'柳树',bamboo:'竹'};
 
 /* art keys: shape,h,w,cap,cap2,gill,stemC,sw,stemH, ring,volva,
    warts/wartC, scales/scaleC, zones, fib, slime, pits, specks/speckC,

@@ -55,8 +55,12 @@ function applyMute(){
 }
 
 /* ====================== BGM (per-biome, crossfaded) ====================== */
+/* E2.2：bamboo/alpine 暂无专属曲目，先借用氛围最接近的现有曲；
+   待后续做 Suno 专属 BGM 后，只需把这两行改成各自的 assets/bgm/bamboo.mp3 / alpine.mp3 即可，其余代码无需改动 */
 const BGM_FILES={forest:'assets/bgm/forest.mp3',meadow:'assets/bgm/meadow.mp3',pine:'assets/bgm/pine.mp3',
-  wetland:'assets/bgm/wetland.mp3',grove:'assets/bgm/grove.mp3'};
+  wetland:'assets/bgm/wetland.mp3',grove:'assets/bgm/grove.mp3',
+  bamboo:'assets/bgm/grove.mp3',   /* TODO(E4/内容补充): 替换为专属竹林曲 */
+  alpine:'assets/bgm/pine.mp3'};   /* TODO(E4/内容补充): 替换为专属高山曲 */
 const BGM_VOL=0.5;
 const bgmEls={};
 let bgmKey=null,bgmFadeReq=null;

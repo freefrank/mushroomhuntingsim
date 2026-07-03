@@ -210,7 +210,7 @@ const ACH=[
   {id:'rain',ic:'🌧️',t:'雨中漫步',d:'在雨天采到一朵蘑菇',f:s=>!!s.flags.rain},
   {id:'winter',ic:'⛄',t:'踏雪寻菇',d:'在冬季记录 2 个新物种',f:s=>(s.flags.winterDisc||0)>=2},
   {id:'deep',ic:'🧭',t:'深山探险',d:'深入林间 10 次',f:s=>s.maxDepth>=10},
-  {id:'travel',ic:'🗺️',t:'走遍四方',d:'探访全部 5 种环境',f:s=>s.visited.size>=5},
+  {id:'travel',ic:'🗺️',t:'走遍四方',d:'探访全部 '+Object.keys(BIOMES).length+' 种环境',f:s=>s.visited.size>=Object.keys(BIOMES).length},
   {id:'biz1',ic:'💰',t:'首笔生意',d:'第一次在小屋卖出蘑菇',f:s=>s.stats.sold>=1},
   {id:'biz500',ic:'🪙',t:'小有积蓄',d:'累计赚得 500 金币',f:s=>s.stats.earned>=500},
   {id:'biz10',ic:'🏆',t:'金字招牌',d:'完成 10 单委托',f:s=>s.stats.ordersDone>=10},
@@ -248,7 +248,10 @@ function refreshHint(){
   const hiddenHere=mushrooms.some(m=>!m.picked&&!m.revealed);
   let msg='';
   if(!pool.length){
-    msg='❄️ 冬日的'+BIOMES[state.biome].n+'一片寂静，几乎见不到菌子。<br>去<b>阔叶林</b>看看吧——枯木上还有平菇和金针菇，栎树下埋着松露。';
+    /* E2.2：竹林/高山两处新环境在物种内容（E3）上线前常年空场，用通用文案兜底，冬季沿用原有措辞 */
+    msg=state.season===3
+      ?'❄️ 冬日的'+BIOMES[state.biome].n+'一片寂静，几乎见不到菌子。<br>去<b>阔叶林</b>看看吧——枯木上还有平菇和金针菇，栎树下埋着松露。'
+      :'🌫️ 这片'+BIOMES[state.biome].n+'眼下还没有记录到菌类踪迹。<br>去<b>阔叶林</b>看看吧——枯木上还有平菇和金针菇，栎树下埋着松露。';
   }
   else if(!mushrooms.length)msg='这片林子静悄悄的，试试<b>深入林间</b>。';
   else if(newHere)msg='✦ 这片林子里似乎藏着<b>未知的菌类</b>…';

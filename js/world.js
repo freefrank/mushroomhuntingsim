@@ -2,7 +2,12 @@
 /* ====================== world ====================== */
 const scene=document.getElementById('scene');
 const ctx=scene.getContext('2d');
-const WW=2400,WH=1350;
+/* E2.1 地图放大：2400×1350 → 3400×1900（面积×~2，实测中端 FPS 达标后选定，见验收记录）。
+   AREA_K 按新旧面积比推导装饰/簇数缩放；MAP_SCALE 为对应线性比例，用于时长/距离类阈值的适度放大。 */
+const WW=3400,WH=1900;
+const AREA_K=(WW*WH)/(2400*1350);
+const MAP_SCALE=Math.sqrt(AREA_K);
+function sK(rg,a,b){const k=AREA_K;return rint(rg,Math.max(1,Math.round(a*k)),Math.max(1,Math.round(b*k)));}
 let VW=1200,VH=675,ZOOM=1,DPR=1;
 let ground=mkCanvas(WW,WH);
 const gc=ground.getContext('2d');
@@ -44,6 +49,10 @@ function PAL(){
     meadow:{g1:'#86ab55',g2:'#789c4a',dirt:'#96754a',foli:['#5a9c4a','#6aa855'],trunk:'#6a4c2c',trees:['oak']},
     pine:{g1:'#5c7448',g2:'#50663e',dirt:'#7d6644',foli:['#2d5940','#234a34','#356651'],trunk:'#4a3421',trees:['pine','pine','pine','birch']},
     wetland:{g1:'#647b58',g2:'#596d4e',dirt:'#5d5a42',foli:['#42604a','#4d6e50'],trunk:'#4c4030',trees:['willow','willow','oak']},
+    /* E2.2 竹林幽径：翠竹疏影、湿润青绿 */
+    bamboo:{g1:'#5f9a5c',g2:'#4f8850',dirt:'#5f5638',foli:['#7fae52','#8fbf5f','#6a9a48','#5c8a4a'],trunk:'#7a6a38',trees:['bamboo','bamboo','bamboo','bamboo']},
+    /* E2.2 高山苔甸：冷冽苔绿+石灰+残雪，装饰以矮化针叶/枯枝与大量岩石为主 */
+    alpine:{g1:'#7a9482',g2:'#6c8574',dirt:'#8a877c',foli:['#3f6a52','#527d64','#3a5c4a'],trunk:'#6a645c',trees:['bare','bare','pine']},
     grove:{g1:'#413a66',g2:'#372f58',dirt:'#4a3f6e',foli:['#5b3f7a','#6a4a8e','#463066'],trunk:'#3a2b52',trees:['oak']},
   }[b];
   const o=JSON.parse(JSON.stringify(base));
@@ -51,9 +60,11 @@ function PAL(){
     if(s===0){o.g1=mix(o.g1,'#a7d56a',.26);o.g2=mix(o.g2,'#96c45c',.26);o.foli=o.foli.map(f=>mix(f,'#7fbf5f',.28));}
     if(s===1){o.g1=mix(o.g1,'#3f9a46',.14);o.g2=mix(o.g2,'#357f3c',.14);o.foli=o.foli.map(f=>shade(f,-6));}
     if(s===2){o.g1=mix(o.g1,'#b09040',.4);o.g2=mix(o.g2,'#9a7c36',.4);
-      if(b!=='pine')o.foli=['#b0762c','#c08a30','#9a5f28','#8f8a3a'];}
+      if(b!=='pine'&&b!=='bamboo'&&b!=='alpine')o.foli=['#b0762c','#c08a30','#9a5f28','#8f8a3a'];}
     if(s===3){o.g1=mix(o.g1,'#e6ecf1',.76);o.g2=mix(o.g2,'#d4dfe7',.76);o.dirt=mix(o.dirt,'#cdd6de',.5);
-      o.foli=b==='pine'?o.foli.map(f=>mix(f,'#dfe8ee',.12)):o.foli;}
+      o.foli=(b==='pine'||b==='bamboo'||b==='alpine')?o.foli.map(f=>mix(f,'#dfe8ee',.12)):o.foli;}
+    /* 高山苔甸常年带一层冷霜基调（石灰质+残雪），冬季再叠加通用雪化更显厚重 */
+    if(b==='alpine'){o.g1=mix(o.g1,'#dfe6df',.14);o.g2=mix(o.g2,'#cddbd0',.12);o.dirt=mix(o.dirt,'#c9cec2',.2);}
   }
   return o;
 }
@@ -328,6 +339,58 @@ function mkReeds(rg,P){
   return {cn,W,H,ox:cx,oy:baseY,shR:8};
 }
 
+/* E2.2 竹林幽径：成丛细高竹竿+竹节+顶部披针叶，风格同现有 mk 系（渐变+路径、软阴影） */
+function mkBamboo(rg,P){
+  const n=rint(rg,4,7),maxH=rint(rg,140,206),W=96,H=maxH+34,cx=W>>1,baseY=H-4;
+  const cn=mkCanvas(W,H),c=cn.getContext('2d');
+  c.lineCap='round';c.lineJoin='round';
+  const stemBase=mix('#a8c46a',P.foli[0],.35);
+  const culms=[];
+  for(let i=0;i<n;i++)culms.push({x:cx+rf(rg,-W*.3,W*.3),h:maxH*rf(rg,.52,1),lean:rf(rg,-11,11),w:rf(rg,3,5.4)});
+  culms.sort((a,b)=>a.h-b.h);
+  for(const cu of culms){
+    const topX=cu.x+cu.lean,topY=baseY-cu.h;
+    const g=c.createLinearGradient(cu.x-cu.w,0,cu.x+cu.w,0);
+    g.addColorStop(0,shade(stemBase,26));g.addColorStop(.5,stemBase);g.addColorStop(1,shade(stemBase,-24));
+    c.strokeStyle=g;c.lineWidth=cu.w;
+    c.beginPath();c.moveTo(cu.x,baseY);c.quadraticCurveTo(cu.x+cu.lean*.5,baseY-cu.h*.55,topX,topY);c.stroke();
+    /* 竹节：沿竿身分段的横纹 */
+    const nodeN=Math.max(3,Math.round(cu.h/20));
+    c.strokeStyle=rgba(shade(stemBase,-30),.65);c.lineWidth=1;
+    for(let k=1;k<nodeN;k++){
+      const t=k/nodeN,ny=baseY-cu.h*t,nx=cu.x+cu.lean*t;
+      c.beginPath();c.moveTo(nx-cu.w*.75,ny);c.lineTo(nx+cu.w*.75,ny);c.stroke();
+    }
+    /* 顶部披针叶丛 */
+    const leafN=rint(rg,3,5);
+    for(let l=0;l<leafN;l++){
+      const a=-Math.PI/2+rf(rg,-1.15,1.15),ll=rf(rg,15,27);
+      const lx=topX+Math.cos(a)*ll,ly=topY+Math.sin(a)*ll*.82;
+      const leafCol=shade(pick(rg,P.foli),rint(rg,-10,10));
+      const nx=Math.cos(a+Math.PI/2)*3.4,ny=Math.sin(a+Math.PI/2)*3.4;
+      c.fillStyle=leafCol;
+      c.beginPath();
+      c.moveTo(topX,topY-3);
+      c.quadraticCurveTo((topX+lx)/2+nx,(topY+ly)/2+ny,lx,ly);
+      c.quadraticCurveTo((topX+lx)/2-nx,(topY+ly)/2-ny,topX,topY-3);
+      c.closePath();c.fill();
+    }
+  }
+  if(state.season===3){
+    c.fillStyle='rgba(240,246,250,.6)';
+    for(const cu of culms){const topX=cu.x+cu.lean,topY=baseY-cu.h;
+      c.beginPath();c.ellipse(topX,topY+4,cu.w*2.4,cu.w*.9,0,0,7);c.fill();}
+  }
+  return {cn,W,H,ox:cx,oy:baseY,shR:30,tree:'bamboo'};
+}
+/* E2.2 高山苔甸：把任意 mk 装饰按比例缩小（用于矮化针叶/枯枝），几何比例整体保持，无需改动原绘制函数 */
+function shrinkDeco(d,s){
+  const W=Math.max(2,Math.round(d.W*s)),H=Math.max(2,Math.round(d.H*s));
+  const cn=mkCanvas(W,H),c=cn.getContext('2d');
+  c.drawImage(d.cn,0,0,d.W,d.H,0,0,W,H);
+  return {cn,W,H,ox:Math.round(d.ox*s),oy:Math.round(d.oy*s),shR:Math.max(6,Math.round(d.shR*s)),tree:d.tree,len:d.len};
+}
+
 /* ---------- ground baking ---------- */
 function bakeShadow(x,y,r){
   const g=gc.createRadialGradient(x,y,1,x,y,r);
@@ -336,9 +399,10 @@ function bakeShadow(x,y,r){
   gc.fillStyle=g;gc.beginPath();gc.arc(x,y,r,0,Math.PI*2);gc.fill();gc.restore();
 }
 function bakeGround(rg,P){
+  const K=AREA_K; /* E2.1：地面纹理密度按面积因子同比放大，避免大地图显得空旷 */
   gc.fillStyle=P.g1;gc.fillRect(0,0,WW,WH);
-  for(let i=0;i<170;i++)softBlob(gc,rg()*WW,rg()*WH,rf(rg,30,95),i%2?P.g2:mix(P.g1,P.g2,.5),.32);
-  for(let i=0;i<60;i++)softBlob(gc,rg()*WW,rg()*WH,rf(rg,22,52),shade(P.g1,10),.28);
+  for(let i=0;i<Math.round(170*K);i++)softBlob(gc,rg()*WW,rg()*WH,rf(rg,30,95),i%2?P.g2:mix(P.g1,P.g2,.5),.32);
+  for(let i=0;i<Math.round(60*K);i++)softBlob(gc,rg()*WW,rg()*WH,rf(rg,22,52),shade(P.g1,10),.28);
   // ponds (wetland; frozen in winter)
   if(state.biome==='wetland'){
     for(let i=0;i<3;i++){
@@ -362,7 +426,8 @@ function bakeGround(rg,P){
   }
   // winding dirt trail
   let tx=rg()*WW*.2,ty=rf(rg,WH*.3,WH*.7),ang=rf(rg,-.4,.4);
-  for(let i=0;i<520;i++){
+  const trailSteps=Math.round(520*MAP_SCALE);
+  for(let i=0;i<trailSteps;i++){
     ang+=(rg()-.5)*.22;ang*=.96;
     tx+=Math.cos(ang)*7;ty+=Math.sin(ang)*7*.6;
     if(tx<0||tx>WW||ty<20||ty>WH-20)break;
@@ -370,13 +435,13 @@ function bakeGround(rg,P){
     if(rg()<.3)softBlob(gc,tx+rf(rg,-6,6),ty+rf(rg,-4,4),rf(rg,6,10),shade(P.dirt,18),.5);
   }
   // speckle
-  for(let i=0;i<2400;i++){
+  for(let i=0;i<Math.round(2400*K);i++){
     gc.fillStyle=rgba(rg()<.5?shade(P.g1,14):shade(P.g2,-14),.5);
     gc.fillRect(rg()*WW,rg()*WH,2,2);
   }
   // grass strokes
   gc.lineCap='round';
-  const gcnt=state.season===3?450:1700;
+  const gcnt=Math.round((state.season===3?450:1700)*K);
   for(let i=0;i<gcnt;i++){
     const x=rg()*WW,y=rg()*WH,hgt=rf(rg,4,10);
     const col=state.season===3?'#f2f6f9':state.season===2?mix(P.g2,'#b8862f',.5):shade(P.g2,rint(rg,-22,-4));
@@ -386,15 +451,33 @@ function bakeGround(rg,P){
   // pine needle litter
   if(state.biome==='pine'&&state.season!==3){
     gc.lineWidth=1;
-    for(let i=0;i<600;i++){
+    for(let i=0;i<Math.round(600*K);i++){
       const x=rg()*WW,y=rg()*WH,a=rg()*6.28;
       gc.strokeStyle=rgba(mix(P.dirt,'#a86a2a',.5),.5);
       gc.beginPath();gc.moveTo(x,y);gc.lineTo(x+Math.cos(a)*5,y+Math.sin(a)*2.4);gc.stroke();
     }
   }
+  // E2.2 竹叶碎片（竹林幽径地面常年可见，四季不落）
+  if(state.biome==='bamboo'&&state.season!==3){
+    gc.lineWidth=1.3;
+    for(let i=0;i<Math.round(320*K);i++){
+      const x=rg()*WW,y=rg()*WH,a=rg()*6.28;
+      gc.strokeStyle=rgba(pick(rg,['#7fae52','#9ac26a','#6a9a48','#587e40']),.55);
+      gc.beginPath();gc.moveTo(x,y);gc.lineTo(x+Math.cos(a)*6.5,y+Math.sin(a)*2.8);gc.stroke();
+    }
+  }
+  // E2.2 高山苔甸：石灰质斑纹 + 常年可见的雪斑（冬季更浓）
+  if(state.biome==='alpine'){
+    for(let i=0;i<Math.round(46*K);i++){
+      gc.fillStyle=rgba('#c9cabe',.32);
+      gc.beginPath();gc.ellipse(rg()*WW,rg()*WH,rf(rg,10,24),rf(rg,4,9),rf(rg,0,3),0,7);gc.fill();
+    }
+    const snowA=state.season===3?.32:.15;
+    for(let i=0;i<Math.round(56*K);i++)softBlob(gc,rg()*WW,rg()*WH,rf(rg,14,36),'#ffffff',snowA);
+  }
   // flowers
   if(state.biome==='meadow'&&state.season!==3){
-    for(let i=0;i<220;i++){
+    for(let i=0;i<Math.round(220*K);i++){
       const x=rg()*WW,y=rg()*WH;
       const col=pick(rg,['#e85a8a','#ecd23a','#f0a040','#f5f0f0','#c470d8']);
       gc.strokeStyle=rgba('#4d7a3d',.7);gc.lineWidth=1;
@@ -406,38 +489,38 @@ function bakeGround(rg,P){
     }
   }
   if(state.biome==='grove'){
-    for(let i=0;i<320;i++){
+    for(let i=0;i<Math.round(320*K);i++){
       const x=rg()*WW,y=rg()*WH;
       softBlob(gc,x,y,rf(rg,2,5),rg()<.5?'#8affe0':'#b09af0',.5);
     }
   }
-  // autumn fallen leaves
-  if(state.season===2&&state.biome!=='grove'){
-    for(let i=0;i<380;i++){
+  // autumn fallen leaves（灵境/竹林/高山不落这种阔叶，各自另有专属地面纹理）
+  if(state.season===2&&state.biome!=='grove'&&state.biome!=='bamboo'&&state.biome!=='alpine'){
+    for(let i=0;i<Math.round(380*K);i++){
       const x=rg()*WW,y=rg()*WH,a=rg()*6.28;
       gc.fillStyle=rgba(pick(rg,['#c86a25','#d98a3a','#b5471f','#e0a51f','#9a6a2a']),.7);
       gc.save();gc.translate(x,y);gc.rotate(a);
       gc.beginPath();gc.ellipse(0,0,3,1.7,0,0,7);gc.fill();gc.restore();
     }
   }
-  // spring petals
-  if(state.season===0&&state.biome!=='grove'){
-    for(let i=0;i<220;i++){
+  // spring petals（同上，竹林/高山没有对应花树，跳过）
+  if(state.season===0&&state.biome!=='grove'&&state.biome!=='bamboo'&&state.biome!=='alpine'){
+    for(let i=0;i<Math.round(220*K);i++){
       gc.fillStyle=rgba(rg()<.6?'#f0c8d8':'#fae2ea',.85);
       gc.beginPath();gc.ellipse(rg()*WW,rg()*WH,2,1.2,rg()*3,0,7);gc.fill();
     }
   }
   // winter snow drifts sparkle
   if(state.season===3){
-    for(let i=0;i<60;i++)softBlob(gc,rg()*WW,rg()*WH,rf(rg,20,60),'#ffffff',.25);
+    for(let i=0;i<Math.round(60*K);i++)softBlob(gc,rg()*WW,rg()*WH,rf(rg,20,60),'#ffffff',.25);
     gc.fillStyle='rgba(255,255,255,.9)';
-    for(let i=0;i<260;i++)gc.fillRect(rg()*WW,rg()*WH,1.4,1.4);
+    for(let i=0;i<Math.round(260*K);i++)gc.fillRect(rg()*WW,rg()*WH,1.4,1.4);
   }
 }
 function bakeDapple(rg){
   if(state.biome==='grove'||state.season===3)return;
   gc.save();gc.globalCompositeOperation='overlay';
-  for(let i=0;i<22;i++)softBlob(gc,rg()*WW,rg()*WH,rf(rg,30,64),'#fff4be',.12);
+  for(let i=0;i<Math.round(22*AREA_K);i++)softBlob(gc,rg()*WW,rg()*WH,rf(rg,30,64),'#fff4be',.12);
   gc.restore();
 }
 
@@ -466,7 +549,9 @@ function forecast(){return weatherFor(state.day+1,state.biome,state.season);}
 
 /* ---------- 日光节律：进入林地起累计的毫秒时钟（4.3），跨文件共享 ---------- */
 let dayClock=0,_lastDusk=false;
-function daylightMs(){return(state.tools&&state.tools.lantern?6:4)*60000;} /* 灯笼：白昼 4min → 6min */
+/* E2.1：地图放大后走一趟更久，白昼时长按线性比例适度延长（非满比例，约+25%），灯笼倍率不变 */
+const DAY_MS_SCALE=1+(MAP_SCALE-1)*.6;
+function daylightMs(){return Math.round((state.tools&&state.tools.lantern?6:4)*60000*DAY_MS_SCALE);} /* 灯笼：白昼 4min → 6min（再乘地图放大系数） */
 function duskEndMs(){return daylightMs()+60000;} /* 之后 1 分钟黄昏渐变，再往后是恒定暮色 */
 function updateExploreBtnLabel(){
   const btn=document.getElementById('exploreBtn');
@@ -521,17 +606,21 @@ function newField(advanceDay){
 
   decos=[];grassPatches=[];mushrooms=[];wparts=[];sparts=[];ripples=[];dogTargets=[];
   const isWinter=state.season===3;
+  const isAlpine=state.biome==='alpine';
   function mkT(){
     let kind=pick(rg,P.trees);
     if(isWinter&&(kind==='oak'||kind==='willow')&&state.biome!=='grove'&&rg()<.6)return mkBare(rg,P);
     if(kind==='oak')return mkOak(rg,P,'oak');
     if(kind==='birch')return mkBirch(rg,P);
-    if(kind==='pine')return mkPine(rg,P);
+    if(kind==='pine')return isAlpine?shrinkDeco(mkPine(rg,P),.62):mkPine(rg,P);
     if(kind==='willow')return mkWillow(rg,P);
+    if(kind==='bamboo')return mkBamboo(rg,P);
+    if(kind==='bare')return isAlpine?shrinkDeco(mkBare(rg,P),.62):mkBare(rg,P);
     return mkOak(rg,P,'oak');
   }
   function farFromDecos(x,y,d){return decos.every(q=>Math.hypot(q.x-x,q.y-y)>d);}
-  const nT=state.biome==='meadow'?rint(rg,15,19):rint(rg,36,46);
+  /* E2.1：树木/装饰/草丛/蘑菇簇数量按面积因子 sK() 同比放大；farFromDecos 间距保持不变（密度不变、范围变大） */
+  const nT=state.biome==='meadow'?sK(rg,15,19):isAlpine?sK(rg,20,28):sK(rg,36,46);
   for(let i=0;i<nT;i++){
     for(let t=0;t<16;t++){
       const x=rint(rg,50,WW-50),y=rint(rg,60,WH-24);
@@ -539,9 +628,10 @@ function newField(advanceDay){
     }
   }
   const isMeadow=state.biome==='meadow';
-  const props=[['bush',rint(rg,20,28),mkBush],['rock',rint(rg,9,13),mkRock],
-               ['stump',isMeadow?rint(rg,1,2):rint(rg,5,7),mkStump],['log',isMeadow?rint(rg,1,2):rint(rg,6,8),mkLog]];
-  if(state.biome==='wetland')props.push(['reeds',rint(rg,14,18),mkReeds]);
+  /* 高山苔甸：矮化针叶/枯枝已偏少，遍地碎石代替灌木——多 mkRock、少量灌木 */
+  const props=[['bush',isAlpine?sK(rg,6,10):sK(rg,20,28),mkBush],['rock',isAlpine?sK(rg,26,36):sK(rg,9,13),mkRock],
+               ['stump',isMeadow?sK(rg,1,2):sK(rg,5,7),mkStump],['log',isMeadow?sK(rg,1,2):sK(rg,6,8),mkLog]];
+  if(state.biome==='wetland')props.push(['reeds',sK(rg,14,18),mkReeds]);
   for(const[kind,n,mk]of props){
     for(let i=0;i<n;i++){
       for(let t=0;t<14;t++){
@@ -551,7 +641,7 @@ function newField(advanceDay){
     }
   }
   if(!isWinter){
-    const nG=state.biome==='meadow'?rint(rg,18,24):rint(rg,12,17);
+    const nG=state.biome==='meadow'?sK(rg,18,24):sK(rg,12,17);
     for(let i=0;i<nG;i++){
       const x=rint(rg,40,WW-40),y=rint(rg,50,WH-24),r=rint(rg,18,30);
       const blades=[];const nb=Math.round(r*1.7);
@@ -674,10 +764,10 @@ function newField(advanceDay){
     for(let k=0;k<n;k++)addM(sp,ax+rf(rg,-20,20),ay+rf(rg,-12,12),inG&&rg()<.8);
   }
   if(pool.length){
-    let nC=isWinter?rint(rg,3,4):rint(rg,7,9);
-    if(raining)nC+=3;
+    let nC=isWinter?sK(rg,3,4):sK(rg,7,9);
+    if(raining)nC+=Math.round(3*AREA_K);
     for(let ci=0;ci<nC;ci++)spawnCluster(weighted());
-    for(let i=0;i<rint(rg,2,4);i++){
+    for(let i=0;i<sK(rg,2,4);i++){
       const sp=weighted();
       if(sp&&sp.sub!=='wood'&&sp.sub!=='trunk')
         addM(sp,rint(rg,50,WW-50),rint(rg,50,WH-30),false);

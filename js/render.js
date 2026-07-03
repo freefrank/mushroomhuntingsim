@@ -118,6 +118,7 @@ function drawPlayer(crouch){
 
 /* ====================== P3 猎菇犬 ====================== */
 let dogState={x:0,y:0,dir:0,flip:false,phase:0,moving:false,mode:'follow',target:null,sitPhase:0,spin:0,_phase:'go',sniffMs:0};
+const DOG_TELEPORT_DIST=Math.round(240*MAP_SCALE); /* E2.1：地图放大后适度调大猎菇犬瞬移阈值 */
 let dogIdleT=0;
 function updateDog(){
   if(!state.tools.dog)return;
@@ -165,7 +166,7 @@ function updateDog(){
   const tx=p.x-fx*46+lateral,ty=p.y-fy*46;
   const dist=Math.hypot(tx-dogState.x,ty-dogState.y);
   const px0=dogState.x,py0=dogState.y;
-  if(dist>240){dogState.x=tx;dogState.y=ty;} /* 距离过远（跨场景）直接瞬移，防止丢狗 */
+  if(dist>DOG_TELEPORT_DIST){dogState.x=tx;dogState.y=ty;} /* 距离过远（跨场景）直接瞬移，防止丢狗；阈值按 E2.1 地图放大系数适度调大 */
   else{
     const lerp=1-Math.pow(.92,dtf);
     dogState.x+=(tx-dogState.x)*lerp;dogState.y+=(ty-dogState.y)*lerp;
