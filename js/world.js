@@ -14,7 +14,8 @@ function resizeView(){
   if(!w||!h)return;
   DPR=Math.min(window.devicePixelRatio||1,2);
   ZOOM=Math.max(.6,Math.min(1.05,Math.sqrt(w*h)/900));
-  VW=Math.min(WW,w/ZOOM);VH=Math.min(WH,h/ZOOM);
+  ZOOM=Math.max(ZOOM,w/WW,h/WH);
+  VW=w/ZOOM;VH=h/ZOOM;
   scene.width=Math.max(2,Math.round(w*DPR));
   scene.height=Math.max(2,Math.round(h*DPR));
   cam.x=Math.max(0,Math.min(WW-VW,cam.x));
