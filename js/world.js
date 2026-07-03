@@ -437,7 +437,9 @@ function bakeDapple(rg){
 }
 
 /* ---------- field generation ---------- */
-function newField(){
+function newField(advanceDay){
+  /* 只有「深入林间」触发的调用会推进天数（P1 0.2）；切换季节/环境时 advanceDay 为假，不加天 */
+  if(advanceDay)state.day++;
   state.depth++;if(state.depth>state.maxDepth)state.maxDepth=state.depth;
   const seed=hash(state.biome+state.season+'#'+state.depth+'@'+Math.floor(Math.random()*1e9));
   const rg=mulberry32(seed);
@@ -614,5 +616,6 @@ function newField(){
   cam.x=Math.max(0,Math.min(WW-VW,player.x-VW/2));
   cam.y=Math.max(0,Math.min(WH-VH,player.y-VH/2));
   state.visited.add(state.biome);
+  ensureOrders();
   updateHUD();refreshHint();checkAch();save();
 }

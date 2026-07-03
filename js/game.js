@@ -14,8 +14,10 @@ function ecoText(sp){
 }
 function doPick(){
   if(!activeM||paused)return;
+  if(state.inv.length>=state.cap){toast('🧺 篮子满了，去小屋卖掉些吧');return;}
   const m=activeM,sp=SPMAP[m.id];
-  m.picked=true;state.picks++;state.basket++;
+  m.picked=true;state.picks++;
+  state.inv.push({id:sp.id,q:1,fr:1,var:null,day:state.day});
   state.count[m.id]=(state.count[m.id]||0)+1;
   if(state.weather==='rain')state.flags.rain=true;
   if(sp.sub==='wood'||sp.sub==='stump'||sp.sub==='trunk')state.flags.wood=(state.flags.wood||0)+1;
@@ -100,6 +102,9 @@ const ACH=[
   {id:'winter',ic:'⛄',t:'踏雪寻菇',d:'在冬季记录 2 个新物种',f:s=>(s.flags.winterDisc||0)>=2},
   {id:'deep',ic:'🧭',t:'深山探险',d:'深入林间 10 次',f:s=>s.maxDepth>=10},
   {id:'travel',ic:'🗺️',t:'走遍四方',d:'探访全部 5 种环境',f:s=>s.visited.size>=5},
+  {id:'biz1',ic:'💰',t:'首笔生意',d:'第一次在小屋卖出蘑菇',f:s=>s.stats.sold>=1},
+  {id:'biz500',ic:'🪙',t:'小有积蓄',d:'累计赚得 500 金币',f:s=>s.stats.earned>=500},
+  {id:'biz10',ic:'🏆',t:'金字招牌',d:'完成 10 单委托',f:s=>s.stats.ordersDone>=10},
 ];
 function checkAch(){
   for(const a of ACH){
@@ -129,7 +134,8 @@ function refreshHint(){
 
 /* ====================== HUD & modals ====================== */
 function updateHUD(){
-  document.getElementById('basketN').textContent=state.basket;
+  document.getElementById('basketN').textContent=state.inv.length+'/'+state.cap;
+  document.getElementById('coinN').textContent=state.coins;
   document.getElementById('discN').textContent=state.disc.size;
   document.getElementById('totN').textContent=TOTAL;
   document.getElementById('biomeBtn').textContent=BIOMES[state.biome].ic+' '+BIOMES[state.biome].n;
@@ -230,9 +236,12 @@ function openAch(){
   document.getElementById('achModal').classList.add('show');
 }
 document.getElementById('resetBtn').onclick=()=>{
-  state.disc.clear();state.ach.clear();state.picks=0;state.basket=0;state.count={};
+  state.disc.clear();state.ach.clear();state.picks=0;state.count={};
   state.maxDepth=0;state.depth=0;
   state.flags={rain:false,wood:0,ring:false,winterDisc:0};state.visited.clear();
+  state.coins=0;state.inv=[];state.cap=25;state.day=1;state.orders=[];
+  state.tools={};state.buffs={};state.cooked=[];
+  state.stats={sold:0,earned:0,ordersDone:0,mimicCaught:0,mimicFooled:0};
   save();newField();openAch();updateHUD();toast('进度已重置');
 };
 
@@ -302,7 +311,7 @@ scene.addEventListener('pointermove',e=>{
 function sceneUp(e){if(e.pointerId===scenePointerId)scenePointerId=null;}
 scene.addEventListener('pointerup',sceneUp);
 scene.addEventListener('pointercancel',sceneUp);
-document.getElementById('exploreBtn').onclick=()=>{if(!paused){newField();toast('🍃 你走得更深了…');}};
+document.getElementById('exploreBtn').onclick=()=>{if(!paused){newField(true);toast('🍃 你走得更深了…');}};
 document.getElementById('biomeBtn').onclick=openBiome;
 document.getElementById('codexBtn').onclick=openCodex;
 document.getElementById('achBtn').onclick=openAch;
@@ -319,4 +328,15 @@ document.getElementById('startBtn').onclick=async()=>{
   paused=false;
 };
 document.getElementById('totN').textContent=TOTAL;
-window.__mh={state,newField,SP,SPRITE,player,cam,view:()=>({VW,VH}),mushrooms:()=>mushrooms,pick:()=>doPick(),setActive:m=>{activeM=m;},setPaused:v=>{paused=v;}};
+window.__mh={
+  state,newField,SP,SPRITE,player,cam,view:()=>({VW,VH}),mushrooms:()=>mushrooms,pick:()=>doPick(),
+  setActive:m=>{activeM=m;},setPaused:v=>{paused=v;},
+  /* P1 市集 + 委托 验收钩子 */
+  coins:()=>state.coins,
+  inv:()=>state.inv,
+  orders:()=>state.orders,
+  sellAll,
+  openHut,
+  deliver,
+  priceOf,
+};

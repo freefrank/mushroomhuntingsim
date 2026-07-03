@@ -143,6 +143,45 @@
   .dangerbtn{margin-top:16px;font-family:inherit;font-size:14px;border:1px solid #a04030;color:#a04030;
     background:#f6ddd6;border-radius:9px;padding:6px 14px;cursor:pointer}
 
+  /* ---------- hut: 出售 / 委托 ---------- */
+  .huthead{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-size:15px;color:#4d3d24}
+  .sellallbtn{font-family:inherit;font-size:14px;border:1px solid #8a6a20;
+    background:linear-gradient(180deg,#ecc46b,#cf9a33);color:#31230a;border-radius:10px;
+    padding:7px 16px;cursor:pointer;font-weight:700}
+  .sellallbtn:active{transform:translateY(1px)}
+  .sellist,.orderlist{display:flex;flex-direction:column;gap:8px}
+  .sellrow{display:flex;align-items:center;gap:10px;background:#fbf6e8;border:1px solid #c9b183;
+    border-radius:12px;padding:8px 12px}
+  .sellrow img{width:40px;height:40px;object-fit:contain;flex:none}
+  .sinfo{flex:1;min-width:0}
+  .sname{font-size:15px;color:#3d2f1a;font-weight:700}
+  .sunit{font-size:12.5px;color:#8a7350;margin-top:2px}
+  .stotal{font-size:15px;color:#a97f2b;font-weight:700;white-space:nowrap}
+  .sellbtn{font-family:inherit;font-size:13.5px;border:1px solid #8a6a20;background:#f6efdd;
+    color:#4a3416;border-radius:9px;padding:6px 12px;cursor:pointer;flex:none}
+  .sellbtn:active{transform:translateY(1px)}
+  .pf{font-size:13px;margin-left:4px}
+  .pf.up{color:#b03030}
+  .pf.down{color:#2e7d32}
+  .pharm{font-size:12px;color:#7a4fa0}
+  .emptytip{padding:24px 10px;text-align:center;color:#8a7350;font-size:14.5px;line-height:1.7}
+  .orow{background:#fbf6e8;border:1px solid #c9b183;border-radius:12px;padding:10px 13px}
+  .onpc{font-size:14px;color:#5a4526;line-height:1.5;margin-bottom:7px}
+  .oline{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+  .oline img{width:32px;height:32px;object-fit:contain;flex:none}
+  .oline span{font-size:15px;color:#3d2f1a;font-weight:700}
+  .oreward{margin-left:auto;color:#a97f2b!important}
+  .obar{display:flex;align-items:center;gap:10px;font-size:12.5px;color:#8a7350;flex-wrap:wrap}
+  .deliverbtn{margin-left:auto;font-family:inherit;font-size:13.5px;border:1px solid #8a6a20;
+    background:linear-gradient(180deg,#ecc46b,#cf9a33);color:#31230a;border-radius:9px;
+    padding:6px 14px;cursor:pointer;font-weight:700}
+  .deliverbtn:active{transform:translateY(1px)}
+  .deliverbtn:disabled{opacity:.4;cursor:not-allowed;filter:grayscale(.5)}
+
+  @media (max-width:420px){
+    .act{font-size:13.5px;padding:10px 3px}
+  }
+
   /* ---------- discovery FX ---------- */
   #fx{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;
     flex-direction:column;gap:8px;background:rgba(7,5,2,.66);backdrop-filter:blur(4px)}
