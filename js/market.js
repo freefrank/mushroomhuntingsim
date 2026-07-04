@@ -1,0 +1,462 @@
+"use strict";
+/* ====================== P1 市集 + 委托 ====================== */
+const BASE_PRICE=[3,8,20,50,120];
+const EDI_FACTOR={edible:1,careful:.8,med:1.5,inedible:.3,poison:.5,deadly:.6};
+function basePrice(sp){return BASE_PRICE[sp.r];}
+function unitBase(sp){return basePrice(sp)*(EDI_FACTOR[sp.edi]==null?1:EDI_FACTOR[sp.edi]);}
+
+/* 时价：每天用同一条 mulberry32(hash('px'+day)) 流依次给每个物种抽 0.8~1.4 的系数，当天内稳定 */
+let _priceDay=-1,_priceMap={};
+function ensurePriceMap(){
+  if(_priceDay===state.day)return;
+  _priceDay=state.day;
+  const rg=mulberry32(hash('px'+state.day));
+  _priceMap={};
+  for(const sp of SP)_priceMap[sp.id]=.8+rg()*.6;
+}
+function priceFactor(id){ensurePriceMap();return _priceMap[id]||1;}
+/* P6 6.1/6.2：品质倍率 1/1.5/2.5（QUALITY 表）× 变异倍率 ×5（VARIANTS 表），二者独立相乘接入定价 */
+function priceOf(id,q,fr,vr){
+  const sp=SPMAP[id];if(!sp)return 0;
+  q=q==null?1:q;fr=fr==null?1:fr;
+  const qmul=(QUALITY[q]&&QUALITY[q].mul)||1;
+  const vmul=(vr&&VARIANTS[vr])?VARIANTS[vr].mul:1;
+  return Math.round(unitBase(sp)*priceFactor(id)*qmul*vmul*(.4+.6*fr));
+}
+
+/* ---------- 委托 ---------- */
+const NPC_TEMPLATES=[
+  '山民老李：想寻几朵{sp}，够我炖一锅热汤就成，{n}朵如何？',
+  '药铺伙计：柜上正缺{sp}，抓药要用，劳驾寻{n}朵来。',
+  '客栈厨娘：今晚客人多，灶上正缺{sp}，能给我凑{n}朵吗？',
+  '教书先生：闲来无事想尝尝{sp}的滋味，烦请寻{n}朵，束脩好说。',
+  '赶路的货郎：听闻此地{sp}正当季，替我捎{n}朵，路上也好换些盘缠。',
+  '隔壁阿婆：老伴念叨着想吃{sp}，你若寻得{n}朵，我拿针线活谢你。',
+  '猎户老周：进山前想带点{sp}垫垫肚子，帮我采{n}朵吧。',
+  '采药人小满：这几日在编药谱，正缺{sp}的样本，{n}朵便够。',
+  '渡口船夫：等船的功夫嘴馋，惦记着{sp}，能寻{n}朵最好。',
+  '画师阿绾：想把{sp}画进册子里，麻烦寻{n}朵新鲜的来做写生。',
+];
+function fillTemplate(t,sp,n){return t.replace(/\{sp\}/g,sp.n).replace(/\{n\}/g,n);}
+function orderPool(){
+  const unlocked=Object.keys(BIOMES).filter(id=>id!=='grove'&&state.disc.size>=BIOMES[id].req);
+  return SP.filter(s=>unlocked.includes(s.biome)&&s.seasons.includes(state.season)&&s.edi!=='deadly');
+}
+let _orderSeq=1;
+function makeOrder(){
+  let pool=orderPool();
+  if(!pool.length)return null;
+  const taken=new Set(state.orders.map(o=>o.spId));
+  const fresh=pool.filter(s=>!taken.has(s.id));
+  if(fresh.length)pool=fresh;
+  const sp=pick(Math.random,pool);
+  const qty=sp.r<=1?rint(Math.random,3,4):sp.r===2?2:1;
+  const reward=Math.ceil(unitBase(sp)*qty*1.8)+RAR[sp.r].s*4;
+  const npc=fillTemplate(pick(Math.random,NPC_TEMPLATES),sp,qty);
+  return {uid:'o'+Date.now()+'_'+(_orderSeq++),spId:sp.id,qty,reward,npc,expires:state.day+3};
+}
+function expireOrders(){
+  state.orders=state.orders.filter(o=>state.day<o.expires);
+}
+function ensureOrders(){
+  expireOrders();
+  let guard=0;
+  while(state.orders.length<3&&guard++<20){
+    const o=makeOrder();
+    if(!o)break;
+    state.orders.push(o);
+  }
+}
+
+/* ---------- 出售页签 ---------- */
+/* P4：分堆键——tainted（污染）与「已自融」（fr=0 的鬼伞类）各自单独成堆；
+   P6：品质/变异也各自成堆，便于出售行分别显示前缀与单价 */
+function stackKey(it){
+  if(it.tainted)return it.id+'#t';
+  if((it.id==='inky'||it.id==='shaggy')&&it.fr<=0)return it.id+'#m';
+  let k=it.id;
+  if(it.q&&it.q>1)k+='#q'+it.q;
+  if(it.var)k+='#v'+it.var;
+  return k;
+}
+function parseStackKey(key){
+  const tainted=key.endsWith('#t'),melted=key.endsWith('#m');
+  const id=key.split('#')[0];
+  let q=1,vr=null;
+  if(!tainted&&!melted){
+    const mq=key.match(/#q(\d)/);if(mq)q=+mq[1];
+    const mv=key.match(/#v(\w+)/);if(mv)vr=mv[1];
+  }
+  return{id,tainted,melted,q,vr};
+}
+function stackInv(){
+  const map={};
+  for(const it of state.inv){
+    const key=stackKey(it);
+    (map[key]=map[key]||[]).push(it);
+  }
+  return map;
+}
+/* tainted（被拟态污染）物品售价恒为 0（P2 2.4）；已自融的鬼伞单价固定 1（P4 4.2） */
+function itemPrice(it){
+  if(it.tainted)return 0;
+  if((it.id==='inky'||it.id==='shaggy')&&it.fr<=0)return 1;
+  return priceOf(it.id,it.q,it.fr,it.var);
+}
+function renderSellList(){
+  const capEl=document.getElementById('hutCapN'),invEl=document.getElementById('hutInvN');
+  if(invEl)invEl.textContent=state.inv.length;
+  if(capEl)capEl.textContent=effCap();
+  const wrap=document.getElementById('sellList');if(!wrap)return;
+  wrap.innerHTML='';
+  const discardBtn=document.getElementById('discardTaintedBtn');
+  if(discardBtn)discardBtn.style.display=state.inv.some(it=>it.tainted)?'inline-block':'none';
+  if(!state.inv.length){
+    wrap.innerHTML='<div class="emptytip">竹篮空空——去林子里采些蘑菇再来吧。</div>';
+    return;
+  }
+  const map=stackInv();
+  const keys=Object.keys(map).sort((a,b)=>{
+    const idA=a.split('#')[0],idB=b.split('#')[0];
+    return SPMAP[idB].r-SPMAP[idA].r;
+  });
+  for(const key of keys){
+    const{id,tainted,melted,q,vr}=parseStackKey(key);
+    const sp=SPMAP[id],items=map[key],n=items.length;
+    /* 堆内逐件按各自 fr 计价再加总，行内单价显示为均价 */
+    const total=items.reduce((s,it)=>s+itemPrice(it),0);
+    const unit=Math.round(total/n);
+    const avgFr=items.reduce((s,it)=>s+it.fr,0)/n;
+    const pf=priceFactor(id);
+    const arrow=(!tainted&&!melted&&pf>=1.15)?'<span class="pf up">↑</span>':(!tainted&&!melted&&pf<=.9)?'<span class="pf down">↓</span>':'';
+    const pharm=(!tainted&&(sp.edi==='poison'||sp.edi==='deadly'))?' <span class="pharm">⚗ 药铺收购</span>':'';
+    const taintedTag=tainted?' <span class="taintedtag">已污染</span>':'';
+    const meltedTag=melted?'（已自融 🖤）':'';
+    /* P6 6.1/6.2：出售行按品质/变异着色前缀 */
+    let qvPrefix='';
+    if(vr&&VARIANTS[vr])qvPrefix='<span class="qtag '+vr+'">'+VARIANTS[vr].n+'</span>';
+    else if(q>=2&&QUALITY[q])qvPrefix='<span class="qtag q'+q+'">'+QUALITY[q].n+'</span>';
+    const frCls=avgFr>=.7?'fr-green':avgFr>=.4?'fr-yellow':'fr-gray';
+    const frBar=tainted?'':'<span class="frtrack" title="新鲜度约 '+Math.round(avgFr*100)+'%"><i class="fri '+frCls+'" style="width:'+Math.round(avgFr*100)+'%"></i></span>';
+    const row=document.createElement('div');row.className='sellrow'+(tainted?' tainted':'');
+    row.innerHTML='<img src="'+spriteURL(id,vr)+'" alt="">'+
+      '<div class="sinfo"><div class="sname">'+qvPrefix+sp.n+meltedTag+arrow+pharm+taintedTag+'</div>'+
+      '<div class="sunit">单价约 '+unit+' 🪙 × '+n+frBar+'</div></div>'+
+      '<div class="stotal">'+total+' 🪙</div>'+
+      '<button class="sellbtn" data-key="'+key+'">'+(tainted?'丢弃':'卖出')+'</button>';
+    wrap.appendChild(row);
+  }
+  wrap.querySelectorAll('.sellbtn').forEach(b=>b.addEventListener('click',()=>sellStack(b.dataset.key)));
+}
+function sellStack(key){
+  const items=state.inv.filter(it=>stackKey(it)===key);
+  if(!items.length)return;
+  const tainted=key.endsWith('#t');
+  const id=key.split('#')[0];
+  let earned=0;if(!tainted)for(const it of items)earned+=itemPrice(it);
+  state.inv=state.inv.filter(it=>stackKey(it)!==key);
+  state.coins+=earned;state.stats.sold+=items.length;state.stats.earned+=earned;
+  /* P4 4.5 赶早市：白昼结束前卖出的部分才计入单日累计 */
+  if(!tainted&&dayClock<daylightMs())bumpDayCounter('earlyMarket',items.length);
+  toast(tainted?'🗑 丢弃了 '+items.length+' 朵已污染的'+SPMAP[id].n:'🪙 +'+earned+' 售出 '+items.length+' 朵 '+SPMAP[id].n);
+  updateHUD();checkAch();save();
+  renderSellList();
+}
+function sellAll(){
+  if(!state.inv.length){toast('篮子空空如也');return;}
+  let earned=0;const count=state.inv.length;
+  for(const it of state.inv)earned+=itemPrice(it);
+  state.inv=[];
+  state.coins+=earned;state.stats.sold+=count;state.stats.earned+=earned;
+  if(dayClock<daylightMs())bumpDayCounter('earlyMarket',count);
+  toast('🪙 +'+earned+' 一键卖出 '+count+' 朵');
+  updateHUD();checkAch();save();
+  renderSellList();
+}
+/* 一键丢弃背包里所有已污染的蘑菇（P2 2.4） */
+function discardTainted(){
+  const n=state.inv.filter(it=>it.tainted).length;
+  if(!n){toast('没有已污染的蘑菇');return;}
+  state.inv=state.inv.filter(it=>!it.tainted);
+  toast('🗑 丢弃了 '+n+' 朵已污染的蘑菇');
+  updateHUD();save();
+  renderSellList();
+}
+
+/* ---------- 委托页签 ---------- */
+function renderOrderList(){
+  ensureOrders();
+  const wrap=document.getElementById('orderList');if(!wrap)return;
+  wrap.innerHTML='';
+  state.orders.forEach((o,i)=>{
+    const sp=SPMAP[o.spId];if(!sp)return;
+    /* P4 4.2：委托只认 fr>=0.5 且非污染的个体 */
+    const have=state.inv.filter(it=>it.id===o.spId&&!it.tainted&&it.fr>=.5).length;
+    const ok=have>=o.qty;
+    const row=document.createElement('div');row.className='orow';
+    row.innerHTML='<div class="onpc">'+o.npc+'</div>'+
+      '<div class="oline"><img src="'+spriteURL(o.spId)+'" alt=""><span>'+sp.n+' × '+o.qty+'</span>'+
+      '<span class="oreward">酬 '+o.reward+' 🪙</span></div>'+
+      '<div class="obar"><span>剩余 '+Math.max(0,o.expires-state.day)+' 天　持有 '+have+'/'+o.qty+'</span>'+
+      '<button class="deliverbtn" data-i="'+i+'"'+(ok?'':' disabled')+'>交付</button></div>';
+    wrap.appendChild(row);
+  });
+  wrap.querySelectorAll('.deliverbtn').forEach(b=>b.addEventListener('click',()=>deliver(+b.dataset.i)));
+}
+function deliver(i){
+  const o=state.orders[i];if(!o)return;
+  /* P4 4.2：委托交付要求 fr>=0.5 的个体 */
+  const have=state.inv.filter(it=>it.id===o.spId&&!it.tainted&&it.fr>=.5);
+  if(have.length<o.qty){toast('还差 '+(o.qty-have.length)+' 朵，凑够了再来吧（新鲜度不足 0.5 的不算数）');return;}
+  let removed=0;
+  state.inv=state.inv.filter(it=>{
+    if(it.id===o.spId&&!it.tainted&&it.fr>=.5&&removed<o.qty){removed++;return false;}
+    return true;
+  });
+  const reward=state.buffs.orderBonus?Math.round(o.reward*state.buffs.orderBonus.v):o.reward; /* P5：椒盐马勃排 +30% */
+  state.coins+=reward;state.stats.ordersDone++;
+  toast('✅ 交付成功——'+o.npc.split('：')[0]+'道了声谢，+'+reward+' 🪙');
+  state.orders.splice(i,1);
+  ensureOrders();
+  updateHUD();checkAch();save();
+  renderSellList();renderOrderList();
+}
+
+/* ====================== P3 道具店 ====================== */
+const TOOLS=[
+  {id:'dog',ic:'🐕',n:'猎菇犬',price:400,desc:'跟随身后；能嗅出埋藏的菇与拟态菇的蛛丝马迹'},
+  {id:'boots',ic:'🥾',n:'雨靴',price:120,desc:'雨天与湿地里，脚步轻快了两成半'},
+  {id:'shovel',ic:'⛏',n:'小铲',price:150,desc:'埋藏的土堆隔老远就能瞧出苗头，还带着一层淡金微光'},
+  {id:'lens',ic:'🔍',n:'放大镜',price:250,desc:'观察蘑菇无需蹲下等待，即刻看清底细'},
+  {id:'lantern',ic:'🏮',n:'灯笼',price:200,desc:'照亮灵境秘林的幽暗，画面更亮、暗角更浅'},
+  {id:'basket1',ic:'🧺',n:'大竹篮 I',price:180,desc:'背包容量 25 → 40'},
+  {id:'basket2',ic:'🧺',n:'大竹篮 II',price:420,desc:'背包容量 40 → 60（需先备好大竹篮 I）'},
+];
+const TOOLMAP={};TOOLS.forEach(t=>TOOLMAP[t.id]=t);
+function applyToolEffect(id){
+  if(id==='basket1')state.cap=Math.max(state.cap,40);
+  if(id==='basket2')state.cap=Math.max(state.cap,60);
+}
+function buyTool(id,free){
+  const t=TOOLMAP[id];if(!t)return;
+  if(state.tools[id]){toast('这件道具已经备下了');return;}
+  if(id==='basket2'&&!state.tools.basket1){toast('先备好大竹篮 I 吧');return;}
+  if(!free){
+    if(state.coins<t.price){toast('🪙 金币不够，先去卖些蘑菇吧');return;}
+    state.coins-=t.price;
+  }
+  state.tools[id]=true;
+  applyToolEffect(id);
+  toast(t.ic+' 备下了「'+t.n+'」'+(free?'':'，花费 '+t.price+' 🪙'));
+  updateHUD();checkAch();save();
+  renderToolList();
+}
+function renderToolList(){
+  const wrap=document.getElementById('toolList');if(!wrap)return;
+  wrap.innerHTML='';
+  for(const t of TOOLS){
+    const owned=!!state.tools[t.id];
+    const lockedBasket2=t.id==='basket2'&&!state.tools.basket1;
+    const afford=state.coins>=t.price;
+    const disabled=owned||lockedBasket2||!afford;
+    const row=document.createElement('div');row.className='toolrow'+(owned?' owned':'');
+    row.innerHTML='<span class="toolic">'+t.ic+'</span>'+
+      '<div class="tinfo"><div class="tname">'+t.n+'</div><div class="tdesc">'+t.desc+'</div>'+
+      (lockedBasket2?'<div class="tnote">需先购买大竹篮 I</div>':'')+'</div>'+
+      '<div class="tprice">'+t.price+' 🪙</div>'+
+      '<button class="buybtn" data-id="'+t.id+'"'+(disabled?' disabled':'')+'>'+(owned?'✓ 已备下':'买下')+'</button>';
+    wrap.appendChild(row);
+  }
+  wrap.querySelectorAll('.buybtn').forEach(b=>b.addEventListener('click',()=>buyTool(b.dataset.id,false)));
+}
+
+/* ---------- 小屋弹窗 ---------- */
+let hutTab='sell';
+function setHutTab(tab){
+  hutTab=tab;
+  const sellPane=document.getElementById('hutSell'),ordPane=document.getElementById('hutOrders'),
+    toolPane=document.getElementById('hutTools'),cookPane=document.getElementById('hutCook');
+  if(sellPane)sellPane.style.display=tab==='sell'?'block':'none';
+  if(ordPane)ordPane.style.display=tab==='orders'?'block':'none';
+  if(toolPane)toolPane.style.display=tab==='tools'?'block':'none';
+  if(cookPane)cookPane.style.display=tab==='cook'?'block':'none';
+  document.querySelectorAll('#hutTabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===tab));
+}
+function openHut(){
+  ensureOrders();
+  const fc=forecast(),fcEl=document.getElementById('hutForecast');
+  if(fcEl)fcEl.textContent='明日：'+(WEATHER_ICON[fc]||'')+' '+(WEATHER_NAME[fc]||'');
+  renderSellList();renderOrderList();renderToolList();renderRecipeList();
+  setHutTab(hutTab);
+  document.getElementById('hutModal').classList.add('show');
+}
+document.getElementById('hutBtn').addEventListener('click',openHut);
+document.getElementById('sellAllBtn').addEventListener('click',sellAll);
+document.getElementById('discardTaintedBtn').addEventListener('click',discardTainted);
+document.querySelectorAll('#hutTabs button').forEach(b=>b.addEventListener('click',()=>setHutTab(b.dataset.tab)));
+
+/* ====================== P5 烹饪 buff（灶台） ====================== */
+/* buff 数值读取：普通 buff 存 {v,until}；灵芝老鸭汤单独存一档 state.buffs.all={speed,luck,reveal,until}，
+   与同名 buff 相乘叠加（仅 luck 类设 2.5 上限，其余不设上限，数值本身很小）。 */
+function buffV(key){return state.buffs[key]?state.buffs[key].v:1;}
+function effMul(key){
+  let v=buffV(key);
+  if(state.buffs.all&&state.buffs.all[key]!=null)v*=state.buffs.all[key];
+  if(key==='luck')v=Math.min(2.5,v);
+  return v;
+}
+/* P5：奶油蘑菇汤——背包临时 +5 格。所有判断/展示背包上限的地方都应改用 effCap() 而非 state.cap */
+function effCap(){return state.cap+(state.buffs.cap?state.buffs.cap.v:0);}
+/* 同名 buff 重做刷新 until、取较高的 v（5.2：「同类不叠加取高」） */
+function setBuff(key,v){
+  const until=state.day+1;
+  const cur=state.buffs[key];
+  state.buffs[key]={v:cur?Math.max(cur.v,v):v,until};
+}
+function setBuffAll(speed,luck,reveal){
+  const until=state.day+1;
+  const cur=state.buffs.all;
+  state.buffs.all={
+    speed:cur?Math.max(cur.speed,speed):speed,
+    luck:cur?Math.max(cur.luck,luck):luck,
+    reveal:cur?Math.max(cur.reveal,reveal):reveal,
+    until,
+  };
+}
+
+const RECIPES=[
+  {key:'speed',name:'小鸡炖蘑菇',ic:'🍲',effectTxt:'移速 +15%（至明日）',
+    options:[[{ids:['honey'],n:3}]],
+    apply(){setBuff('speed',1.15);}},
+  {key:'luck',name:'松茸炊饭',ic:'🍚',effectTxt:'稀有运 ×1.5（至明日）',
+    options:[[{ids:['matsu'],n:1}]],
+    apply(){setBuff('luck',1.5);}},
+  {key:'reveal',name:'黄油煎鸡油菌',ic:'🧈',effectTxt:'蘑菇显形微光半径 +40%（至明日）',
+    options:[[{ids:['chant'],n:3}]],
+    apply(){setBuff('reveal',1.4);}},
+  {key:'cap',name:'奶油蘑菇汤',ic:'🥣',effectTxt:'背包临时 +5 格（至明日）',
+    options:[[{ids:['button','field'],n:4}]],
+    apply(){setBuff('cap',5);}},
+  {key:'instInspect',name:'红菇炖汤',ic:'🍵',effectTxt:'观察无需蹲下等待，即时出卡（等效放大镜一天）',
+    options:[[{ids:['russula'],n:2}]],
+    apply(){setBuff('instInspect',1);}},
+  {key:'orderBonus',name:'椒盐马勃排',ic:'🍖',effectTxt:'委托报酬 +30%（至明日）',
+    options:[[{ids:['puff'],n:2}],[{ids:['gpuff'],n:1}]],
+    apply(){setBuff('orderBonus',1.3);}},
+  {key:'rainSpeed',name:'凉拌木耳',ic:'🥗',effectTxt:'雨天移速 +25%（至明日，与雨靴叠乘）',
+    options:[[{ids:['woodear'],n:3}]],
+    apply(){setBuff('rainSpeed',1.25);}},
+  {key:'lanmao',name:'干煸见手青',ic:'🌶️',effectTxt:'90%：稀有运 ×2；10%：见小人（附赠稀有运 ×1.2）',
+    silent:true,
+    options:[[{ids:['lanmao'],n:2}]],
+    apply(){
+      if(Math.random()<.9){
+        setBuff('luck',2.0);
+        toast('🍲 干煸见手青出锅了！这一锅炒透了，稀有运飙升~');
+      }else{
+        setBuff('luck',1.2);
+        toast('🍲 干煸见手青出锅了……总觉得没炒透？');
+        triggerXiaoren();
+      }
+    }},
+  {key:'all',name:'灵芝老鸭汤',ic:'🍜',effectTxt:'移速 +5%／稀有运 +10%／显形半径 +10%（至明日）',
+    options:[[{ids:['reishi'],n:1}]],
+    apply(){setBuffAll(1.05,1.1,1.1);}},
+  {key:'pity',name:'黑松露炖蛋',ic:'🍳',effectTxt:'明日保底刷出 1 株珍稀（★★★+）蘑菇',
+    options:[[{ids:['truffle'],n:1}]],
+    apply(){setBuff('pity',1);}},
+  /* E4 6：接入竹林/高山两批新种的 3 道新菜谱 */
+  {key:'bambooChicken',name:'竹荪炖鸡',ic:'🍗',effectTxt:'移速 +20%（至明日）',
+    options:[[{ids:['longskirt'],n:1}]],
+    apply(){setBuff('speed',1.2);}},
+  {key:'cordycepsSoup',name:'虫草花汤',ic:'🍶',effectTxt:'移速 +3%／稀有运 +8%／显形范围 +8%（至明日）',
+    options:[[{ids:['militaris'],n:2}],[{ids:['sinensis'],n:1}]],
+    apply(){setBuffAll(1.03,1.08,1.08);}},
+  {key:'hericiumStew',name:'猴头菇煲',ic:'🥘',effectTxt:'背包临时 +3 格（至明日）',
+    options:[[{ids:['hericium'],n:2}]],
+    apply(){setBuff('cap',3);}},
+];
+const RECIPEMAP={};RECIPES.forEach(r=>RECIPEMAP[r.key]=r);
+
+/* 食材消耗：取背包中该物种（或组合池）fr 最高的 N 件，tainted 不可用，fr 需 >=0.5 */
+function eligibleItems(ids){
+  return state.inv.filter(it=>!it.tainted&&it.fr>=.5&&ids.includes(it.id));
+}
+function tryOption(option){
+  const chosen=[];
+  for(const req of option){
+    const pool=eligibleItems(req.ids).filter(it=>!chosen.includes(it));
+    if(pool.length<req.n)return null;
+    pool.sort((a,b)=>b.fr-a.fr);
+    chosen.push(...pool.slice(0,req.n));
+  }
+  return chosen;
+}
+function pickCookOption(recipe){
+  for(const opt of recipe.options){
+    const items=tryOption(opt);
+    if(items)return {opt,items};
+  }
+  return null;
+}
+function missingText(recipe){
+  let best=null;
+  for(const opt of recipe.options){
+    const parts=[];let deficit=0;
+    for(const req of opt){
+      const have=eligibleItems(req.ids).length;
+      const need=Math.max(0,req.n-have);
+      deficit+=need;
+      if(need>0)parts.push(req.ids.map(id=>SPMAP[id].n).join('/')+' 还差 '+need);
+    }
+    if(!best||deficit<best.deficit)best={deficit,parts};
+  }
+  return best&&best.deficit>0?best.parts.join('，'):'';
+}
+/* free=true（验收 cookFree 开关）时不消耗食材，直接做菜 */
+function cookRecipe(key,free){
+  const recipe=RECIPEMAP[key];if(!recipe)return false;
+  if(!free){
+    const sel=pickCookOption(recipe);
+    if(!sel){toast('🍲 食材还不够——'+missingText(recipe));return false;}
+    const ids=new Set(sel.items);
+    state.inv=state.inv.filter(it=>!ids.has(it));
+  }
+  recipe.apply();
+  if(!recipe.silent)toast('🍲 '+recipe.name+' 出锅了！'+recipe.effectTxt);
+  if(!state.cooked.includes(recipe.key))state.cooked.push(recipe.key);
+  updateHUD();checkAch();save();
+  renderRecipeList();renderSellList();
+  return true;
+}
+/* __mh cook(name)：按菜名或 key 做菜；window.cookFree=true 时不耗食材（测试用） */
+function cookByName(name){
+  const recipe=RECIPES.find(r=>r.name===name||r.key===name);
+  if(!recipe){toast('没有这道菜谱');return false;}
+  return cookRecipe(recipe.key,!!window.cookFree);
+}
+function renderRecipeList(){
+  const nEl=document.getElementById('recipeUnlockedN');
+  if(nEl)nEl.textContent=state.cooked.length;
+  const tEl=document.getElementById('recipeTotalN');
+  if(tEl)tEl.textContent=RECIPES.length;
+  const wrap=document.getElementById('recipeList');if(!wrap)return;
+  wrap.innerHTML='';
+  for(const r of RECIPES){
+    const done=state.cooked.includes(r.key);
+    const canCook=!!pickCookOption(r);
+    const missing=canCook?'':missingText(r);
+    const ingredientsHtml=r.options.map(opt=>opt.map(req=>
+      '<span class="ring-ing">'+req.ids.map(id=>'<img src="'+spriteURL(id)+'" alt="" title="'+SPMAP[id].n+'">').join('')+'×'+req.n+'</span>'
+    ).join('')).join('<span class="ring-or">或</span>');
+    const row=document.createElement('div');row.className='reciperow'+(done?' done':'');
+    row.innerHTML='<div class="ringhead"><span class="ric">'+r.ic+'</span>'+
+      '<div class="rinfo"><div class="rname">'+r.name+(done?' <span class="rdone">✓</span>':'')+'</div>'+
+      '<div class="ring">'+ingredientsHtml+'</div></div></div>'+
+      '<div class="reffect">'+r.effectTxt+'</div>'+
+      (missing?'<div class="rmissing">还缺：'+missing+'</div>':'')+
+      '<button class="cookbtn" data-key="'+r.key+'"'+(canCook?'':' disabled')+'>🔥 开火</button>';
+    wrap.appendChild(row);
+  }
+  wrap.querySelectorAll('.cookbtn').forEach(b=>b.addEventListener('click',()=>cookRecipe(b.dataset.key,false)));
+}

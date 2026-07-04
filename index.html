@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>菌踪 · 蘑菇采集模拟器</title>
+<link rel="stylesheet" href="css/style.css">
+<script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+</head>
+<body>
+<div id="app">
+  <div id="hud">
+    <div class="seasons" id="seasonPills"></div>
+    <button class="iconbtn" id="biomeBtn">🌳 阔叶林</button>
+    <span class="badge" id="weatherBadge">☀️</span>
+    <div class="grow"></div>
+    <span class="badge">🧺 <b id="basketN">0</b></span>
+    <span class="badge">🪙 <b id="coinN">0</b></span>
+    <span class="badge">📖 <b id="discN">0</b> / <span id="totN">101</span></span>
+    <button class="iconbtn" id="muteBtn">🔊</button>
+  </div>
+
+  <div id="stage">
+    <canvas id="scene"></canvas>
+    <div id="hint"></div>
+    <div id="prompt"></div>
+    <div id="toasts"></div>
+    <div id="fps"></div>
+    <div id="stick"><div id="knob"></div></div>
+    <button id="inspectBtn">👁 观察</button>
+    <button id="pickBtn">采集</button>
+    <div id="inspectCard">
+      <div class="ichead"><b id="icTitle">观察记录</b><div class="grow"></div><button class="xbtn" id="icClose">✕</button></div>
+      <div id="icTraits"></div>
+      <div id="icVerdict" class="icverdict"></div>
+    </div>
+    <!-- P6 6.3 拍照模式：3:2 取景框，可拖动 -->
+    <div id="photoOverlay">
+      <div id="photoFrame">
+        <span class="pfc tl"></span><span class="pfc tr"></span><span class="pfc bl"></span><span class="pfc br"></span>
+      </div>
+      <div id="photoBar">
+        <button id="photoCancelBtn">取消</button>
+        <button id="shutterBtn">咔嚓 📸</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="actions">
+    <button class="act gold" id="exploreBtn">🍃 深入林间</button>
+    <button class="act" id="hutBtn">🏠 小屋</button>
+    <button class="act" id="codexBtn">📖 蘑菇图鉴</button>
+    <button class="act" id="achBtn">🏅 成就</button>
+    <button class="act" id="photoBtn">📷 拍照</button>
+  </div>
+</div>
+
+<!-- P6 拍照：快门白闪 + 明信片预览 -->
+<div id="flashOverlay"></div>
+<div id="postcardOverlay">
+  <div id="postcardCard"><img id="postcardImg" alt="明信片"></div>
+  <div id="postcardBar">
+    <a id="postcardSave" download="junzong.png">保存图片</a>
+    <button id="postcardRetake">再拍一张</button>
+    <button id="postcardClose">关闭</button>
+  </div>
+</div>
+
+<!-- codex -->
+<div class="modal" id="codexModal">
+  <div class="panel">
+    <div class="phead"><h2>蘑菇图鉴</h2><div class="grow"></div><button class="xbtn" data-close>✕</button></div>
+    <div style="font-size:15px">已记录 <b id="cdxN">0</b> / <span id="cdxT">101</span> 种</div>
+    <div class="pbar"><i id="cdxBar" style="width:0%"></i></div>
+    <div class="filters" id="cdxFilters"></div>
+    <div class="filters" id="cdxSeasonFilters"></div>
+    <div class="grid" id="cdxGrid"></div>
+    <div class="detail" id="cdxDetail" style="display:none"></div>
+  </div>
+</div>
+
+<!-- achievements -->
+<div class="modal" id="achModal">
+  <div class="panel">
+    <div class="phead"><h2>成就</h2><div class="grow"></div><button class="xbtn" data-close>✕</button></div>
+    <div class="alist" id="achList"></div>
+    <button class="dangerbtn" id="resetBtn">重置全部进度</button>
+  </div>
+</div>
+
+<!-- biome select -->
+<div class="modal" id="biomeModal">
+  <div class="panel">
+    <div class="phead"><h2>切换环境</h2><div class="grow"></div><button class="xbtn" data-close>✕</button></div>
+    <div class="blist" id="biomeList"></div>
+  </div>
+</div>
+
+<!-- hut: 出售 / 委托 -->
+<div class="modal" id="hutModal">
+  <div class="panel">
+    <div class="phead"><h2>山脚小屋</h2><span class="hutfc" id="hutForecast"></span><div class="grow"></div><button class="xbtn" data-close>✕</button></div>
+    <div class="filters" id="hutTabs">
+      <button class="on" data-tab="sell">出售</button>
+      <button data-tab="orders">委托</button>
+      <button data-tab="tools">道具店</button>
+      <button data-tab="cook">灶台</button>
+    </div>
+    <div id="hutSell">
+      <div class="huthead">
+        <span>🧺 背包 <b id="hutInvN">0</b> / <span id="hutCapN">25</span></span>
+        <div class="grow"></div>
+        <button class="sellallbtn" id="discardTaintedBtn" style="display:none;background:linear-gradient(180deg,#d9756a,#a04030);color:#fff5f0">🗑 丢弃污染菇</button>
+        <button class="sellallbtn" id="sellAllBtn">一键全卖</button>
+      </div>
+      <div class="sellist" id="sellList"></div>
+    </div>
+    <div id="hutOrders" style="display:none">
+      <div class="orderlist" id="orderList"></div>
+    </div>
+    <div id="hutTools" style="display:none">
+      <div class="toollist" id="toolList"></div>
+    </div>
+    <div id="hutCook" style="display:none">
+      <div class="huthead">
+        <span>🍲 菜谱集　已解锁 <b id="recipeUnlockedN">0</b> / <span id="recipeTotalN">10</span></span>
+      </div>
+      <div class="recipelist" id="recipeList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- discovery -->
+<div id="fx">
+  <canvas id="fxCanvas"></canvas>
+  <div id="fxTitle">✦ 新 发 现 ✦</div>
+  <img id="fxSprite" alt="">
+  <div id="fxName"></div>
+  <div id="fxEn"></div>
+  <div id="fxStars"></div>
+  <span id="fxTagRar"></span>
+  <div id="fxEco"></div>
+  <div id="fxLore"></div>
+  <button id="fxGo">收入图鉴 ▸</button>
+</div>
+
+<!-- start -->
+<div id="start">
+  <img class="titlemush" id="titleMush" alt="">
+  <h1>菌 踪</h1>
+  <p>背上竹篮，走进一片会随四季流转的山林。<br>春寻羊肚，夏拾鸡油，秋访松茸，冬掘松露——<br>每一种菌子，都只在属于它的时节与土壤里生长。</p>
+  <p class="keys">移动：WASD / 方向键 / 摇杆 / 鼠标或手指按住拖动　·　采集：空格 / 采集钮 / 点蘑菇自动走近采集</p>
+  <button id="startBtn">开 始 采 集</button>
+  <p class="visits">
+    <span id="busuanzi_container_site_uv" style="display:none">🍄 已有 <span id="busuanzi_value_site_uv"></span> 位采菇人来过这片林子</span>
+    <span id="busuanzi_container_site_pv" style="display:none">　·　累计 <span id="busuanzi_value_site_pv"></span> 次到访</span>
+  </p>
+</div>
+<script src="js/utils.js"></script>
+<script src="js/data.js"></script>
+<script src="js/mushrooms.js"></script>
+<script src="js/state.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/player.js"></script>
+<script src="js/world.js"></script>
+<script src="js/render.js"></script>
+<script src="js/market.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>
