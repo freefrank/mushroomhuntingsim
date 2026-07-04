@@ -40,7 +40,7 @@ function setRainSound(on){
   if(on&&!rainNode){
     const src=actx.createBufferSource();src.buffer=noiseBuf(2);src.loop=true;
     const f=actx.createBiquadFilter();f.type='highpass';f.frequency.value=1400;
-    const g=actx.createGain();g.gain.value=muted?0:0.035;
+    const g=actx.createGain();g.gain.value=muted?0:0.014;
     src.connect(f);f.connect(g);g.connect(actx.destination);src.start();
     rainNode={src,g};
   }else if(!on&&rainNode){
@@ -50,7 +50,7 @@ function setRainSound(on){
 }
 function applyMute(){
   if(windNode)windNode.g.gain.value=muted?0:0.018;
-  if(rainNode)rainNode.g.gain.value=muted?0:0.035;
+  if(rainNode)rainNode.g.gain.value=muted?0:0.014;
   applyBgmMute();
 }
 
