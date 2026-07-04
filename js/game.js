@@ -200,7 +200,10 @@ const ACH=[
   {id:'p50',ic:'🎒',t:'篮不落空',d:'累计采集 50 朵',f:s=>s.picks>=50},
   {id:'d5',ic:'📖',t:'图鉴新人',d:'记录 5 个物种',f:s=>s.disc.size>=5},
   {id:'d15',ic:'🔬',t:'博物学家',d:'记录 15 个物种',f:s=>s.disc.size>=15},
-  {id:'d30',ic:'🎓',t:'菌物学者',d:'记录 30 个物种',f:s=>s.disc.size>=30},
+  /* E4 3：101 种收集体量下的三级里程碑（小有名气/菌谱大家/菌谱大成），承接原「菌物学者」30 种档位 */
+  {id:'d30',ic:'🎓',t:'小有名气',d:'集齐 30 个物种',f:s=>s.disc.size>=30},
+  {id:'d60',ic:'📚',t:'菌谱大家',d:'集齐 60 个物种',f:s=>s.disc.size>=60},
+  {id:'d100',ic:'🏛️',t:'菌谱大成',d:'集齐 100 个物种',f:s=>s.disc.size>=100},
   {id:'dall',ic:'👑',t:'菌中之王',d:'集齐全部 '+TOTAL+' 个物种',f:s=>s.disc.size>=TOTAL},
   {id:'legend',ic:'🌟',t:'传说之遇',d:'发现一种传说级蘑菇',f:s=>[...s.disc].some(id=>SPMAP[id].r===4)},
   {id:'poison',ic:'☠️',t:'险中识毒',d:'记录 4 种有毒或剧毒的蘑菇',f:s=>[...s.disc].filter(id=>['poison','deadly'].includes(SPMAP[id].edi)).length>=4},
@@ -211,6 +214,11 @@ const ACH=[
   {id:'winter',ic:'⛄',t:'踏雪寻菇',d:'在冬季记录 2 个新物种',f:s=>(s.flags.winterDisc||0)>=2},
   {id:'deep',ic:'🧭',t:'深山探险',d:'深入林间 10 次',f:s=>s.maxDepth>=10},
   {id:'travel',ic:'🗺️',t:'走遍四方',d:'探访全部 '+Object.keys(BIOMES).length+' 种环境',f:s=>s.visited.size>=Object.keys(BIOMES).length},
+  /* E4 3：两个新环境的踏足成就 + 两种签名珍稀的采集成就 */
+  {id:'bamboo1',ic:'🎋',t:'初入竹林',d:'踏足竹林幽径',f:s=>s.visited.has('bamboo')},
+  {id:'alpine1',ic:'🏔',t:'登临高山',d:'踏足高山苔甸',f:s=>s.visited.has('alpine')},
+  {id:'longskirt1',ic:'👗',t:'竹乡之荣',d:'采到长裙竹荪',f:s=>s.disc.has('longskirt')},
+  {id:'sinensis1',ic:'❄️',t:'雪线奇珍',d:'采到冬虫夏草',f:s=>s.disc.has('sinensis')},
   {id:'biz1',ic:'💰',t:'首笔生意',d:'第一次在小屋卖出蘑菇',f:s=>s.stats.sold>=1},
   {id:'biz500',ic:'🪙',t:'小有积蓄',d:'累计赚得 500 金币',f:s=>s.stats.earned>=500},
   {id:'biz10',ic:'🏆',t:'金字招牌',d:'完成 10 单委托',f:s=>s.stats.ordersDone>=10},
@@ -227,7 +235,7 @@ const ACH=[
   /* P5 烹饪 buff */
   {id:'cook1',ic:'🍲',t:'第一口鲜',d:'第一次在灶台做菜',f:s=>s.cooked.length>=1},
   {id:'xiaoren',ic:'👁️',t:'见到小人了',d:'吃到没炒熟的见手青，触发了彩蛋',f:s=>!!s.flags.xiaoren},
-  {id:'allrecipe',ic:'🍜',t:'满汉全菌',d:'做过全部 10 道菜',f:s=>s.cooked.length>=RECIPES.length},
+  {id:'allrecipe',ic:'🍜',t:'满汉全菌',d:'做过全部 '+RECIPES.length+' 道菜',f:s=>s.cooked.length>=RECIPES.length},
   /* P6 品质 / 变异 / 拍照 */
   {id:'premium1',ic:'👑',t:'菌中贵族',d:'首株极品蘑菇入包',f:s=>Object.values(s.best||{}).some(b=>b.q>=3)},
   {id:'albino1',ic:'👻',t:'林间幽灵',d:'采到第一株白化蘑菇',f:s=>Object.values(s.best||{}).some(b=>b.v&&b.v.albino)},
@@ -248,7 +256,7 @@ function refreshHint(){
   const hiddenHere=mushrooms.some(m=>!m.picked&&!m.revealed);
   let msg='';
   if(!pool.length){
-    /* E2.2：竹林/高山两处新环境在物种内容（E3）上线前常年空场，用通用文案兜底，冬季沿用原有措辞 */
+    /* E4 平衡复核：全部 7 环境×4 季度组合均已验证非空，此分支作为未来内容调整时的防御性兜底保留（冬季沿用原有措辞，指引去阔叶林） */
     msg=state.season===3
       ?'❄️ 冬日的'+BIOMES[state.biome].n+'一片寂静，几乎见不到菌子。<br>去<b>阔叶林</b>看看吧——枯木上还有平菇和金针菇，栎树下埋着松露。'
       :'🌫️ 这片'+BIOMES[state.biome].n+'眼下还没有记录到菌类踪迹。<br>去<b>阔叶林</b>看看吧——枯木上还有平菇和金针菇，栎树下埋着松露。';

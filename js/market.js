@@ -365,6 +365,16 @@ const RECIPES=[
   {key:'pity',name:'黑松露炖蛋',ic:'🍳',effectTxt:'明日保底刷出 1 株珍稀（★★★+）蘑菇',
     options:[[{ids:['truffle'],n:1}]],
     apply(){setBuff('pity',1);}},
+  /* E4 6：接入竹林/高山两批新种的 3 道新菜谱 */
+  {key:'bambooChicken',name:'竹荪炖鸡',ic:'🍗',effectTxt:'移速 +20%（至明日）',
+    options:[[{ids:['longskirt'],n:1}]],
+    apply(){setBuff('speed',1.2);}},
+  {key:'cordycepsSoup',name:'虫草花汤',ic:'🍶',effectTxt:'移速 +3%／稀有运 +8%／显形范围 +8%（至明日）',
+    options:[[{ids:['militaris'],n:2}],[{ids:['sinensis'],n:1}]],
+    apply(){setBuffAll(1.03,1.08,1.08);}},
+  {key:'hericiumStew',name:'猴头菇煲',ic:'🥘',effectTxt:'背包临时 +3 格（至明日）',
+    options:[[{ids:['hericium'],n:2}]],
+    apply(){setBuff('cap',3);}},
 ];
 const RECIPEMAP={};RECIPES.forEach(r=>RECIPEMAP[r.key]=r);
 
@@ -428,6 +438,8 @@ function cookByName(name){
 function renderRecipeList(){
   const nEl=document.getElementById('recipeUnlockedN');
   if(nEl)nEl.textContent=state.cooked.length;
+  const tEl=document.getElementById('recipeTotalN');
+  if(tEl)tEl.textContent=RECIPES.length;
   const wrap=document.getElementById('recipeList');if(!wrap)return;
   wrap.innerHTML='';
   for(const r of RECIPES){

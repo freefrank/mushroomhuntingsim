@@ -16,7 +16,9 @@ const EDI={
   deadly:{t:'剧毒',c:'#8a1420',b:'#f0ccc8'},
   med:{t:'药用',c:'#7a4fa0',b:'#e9def4'},
 };
-/* E2.2 解锁门槛重排（按 100 种收集体量的规划值，E3 内容上线前先按当前 40 种手感验证不卡关） */
+/* E2.2 解锁门槛重排（101 种收集体量下已复核：forest+meadow 共 36 种即远超 pine 门槛 6，
+   累计到 pine 后共 54 种＞wetland 门槛 14，再加 wetland 后共 68 种＞bamboo 门槛 22，
+   再加 bamboo 后共 80 种＞grove 门槛 32，再加 grove 后共 91 种＞alpine 门槛 44，循序渐进不卡关，见 E4 平衡复核） */
 const BIOMES={
   forest:{n:'阔叶林',ic:'🌳',req:0,desc:'栎树与桦树的领地，枯木上藏着惊喜'},
   meadow:{n:'草甸',ic:'🌾',req:0,desc:'开阔草地，雨后会冒出蘑菇圈'},
@@ -83,10 +85,10 @@ const SP=[
 {id:'turkeytail',n:'云芝',en:'Trametes versicolor',biome:'forest',seasons:[0,1,2,3],r:0,edi:'inedible',sub:'wood',host:null,rain:false,
  lore:'薄薄的扇形一圈圈叠生在朽木上，环纹深浅相间如孔雀开屏，又似云雾层叠，故名云芝。四季常见却不宜下箸，多入药茶。',
  art:{shape:'shelf',h:14,w:20,cap:'#6a5a44',cap2:'#c8bda0',gill:'#d8cfb8',layers:1,concentric:true,bandC:['#3a4d52','#c9bd9c','#8a5a34','#e8e0cc','#4a6b6a','#7a4a2c'],rimC:'#f2ecd8'}},
-{id:'artistconk',n:'树舌灵芝',en:'Ganoderma applanatum',biome:'forest',seasons:[0,1,2,3],r:1,edi:'med',sub:'trunk',host:null,rain:false,
+{id:'artistconk',n:'树舌灵芝',en:'Ganoderma applanatum',biome:'forest',seasons:[0,1,2,3],r:0,edi:'med',sub:'trunk',host:null,rain:false,
  lore:'灰褐色的厚壳嵌在老树干上，经年不落，切开断面细腻如象牙。旧时画师爱在其背面孔层上刻字作画，故有"画家的孔菌"之称。',
  art:{shape:'shelf',h:30,w:38,cap:'#6f6252',cap2:'#8a7d68',gill:'#d8cfb8',layers:1,zones:true}},
-{id:'redbelt',n:'红缘拟层孔菌',en:'Fomitopsis pinicola',biome:'forest',seasons:[0,1,2,3],r:1,edi:'inedible',sub:'trunk',host:null,rain:false,
+{id:'redbelt',n:'红缘拟层孔菌',en:'Fomitopsis pinicola',biome:'forest',seasons:[0,1,2,3],r:0,edi:'inedible',sub:'trunk',host:null,rain:false,
  lore:'灰白的马蹄形壳边缘镶着一圈鲜艳的橘红，像谁给朽木系了根丝带。终年不谢，却木质坚硬不堪食用。',
  art:{shape:'shelf',h:22,w:30,cap:'#a89a82',cap2:'#c2b89a',gill:'#e8e0c8',layers:2,zones:true,rimC:'#c9432a'}},
 {id:'chaga',n:'桦褐孔菌',en:'Inonotus obliquus',biome:'forest',seasons:[0,1,2,3],r:2,edi:'med',sub:'trunk',host:'birch',rain:false,
@@ -249,7 +251,7 @@ const SP=[
 {id:'longskirt',n:'长裙竹荪',en:'Dictyophora indusiata',biome:'bamboo',seasons:[1],r:3,edi:'edible',sub:'ground',host:'bamboo',rain:true,
  lore:'竹林雨后，网裙从蛋托里缓缓撑开，如仙子曳地长裙，故称"菌中皇后"。清晨采得最是鲜嫩，裙网越密越珍贵，是竹乡人家待客的体面菜。',
  art:{shape:'veiled',h:34,w:14,cap:'#3a3226',cap2:'#5a4c3a',stemC:'#f4f0e0',sw:.22,volva:true,net:9}},
-{id:'shortskirt',n:'短裙竹荪',en:'Dictyophora duplicata',biome:'bamboo',seasons:[1],r:1,edi:'edible',sub:'ground',host:'bamboo',rain:true,
+{id:'shortskirt',n:'短裙竹荪',en:'Dictyophora duplicata',biome:'bamboo',seasons:[1],r:0,edi:'edible',sub:'ground',host:'bamboo',rain:true,
  lore:'与长裙竹荪同科，裙摆却只探出一小截便戛然而止，网眼也稀疏得多。滋味不及"皇后"精细，寻常人家倒也吃得香甜。',
  art:{shape:'veiled',h:26,w:12,cap:'#8a5040',cap2:'#a86850',stemC:'#f0ece0',sw:.2,volva:true,net:4}},
 {id:'shiraia',n:'竹黄',en:'Shiraia bambusicola',biome:'bamboo',seasons:[1,2],r:1,edi:'med',sub:'trunk',host:'bamboo',rain:false,
@@ -276,7 +278,7 @@ const SP=[
 {id:'disseminatus',n:'丛枝鬼伞',en:'Coprinellus disseminatus',biome:'bamboo',seasons:[0,2,3],r:0,edi:'inedible',sub:'stump',host:null,rain:true,
  lore:'老竹桩四周挤出上百朵米粒大小的灰伞，密密麻麻如蚁群列队，故又唤"仙女帽"。不化墨也不宜食，看个热闹便好。',
  art:{shape:'bell',h:12,w:8,cap:'#b8ac96',cap2:'#d0c4a8',gill:'#8a7c68',stemC:'#e6ddc8',sw:.16,cluster:5,fib:true}},
-{id:'bamboonest',n:'竹林鸟巢菌',en:'Cyathus striatus',biome:'bamboo',seasons:[1,2],r:1,edi:'inedible',sub:'ground',host:null,rain:true,
+{id:'bamboonest',n:'竹林鸟巢菌',en:'Cyathus striatus',biome:'bamboo',seasons:[1,2],r:0,edi:'inedible',sub:'ground',host:null,rain:true,
  lore:'竹叶腐殖层里立着一只只灰褐小酒盅，盅底卧着几粒扁圆"鸟卵"，雨点砸落便将卵粒弹射老远，靠这法子撒播孢子。',
  art:{shape:'nest',h:12,w:14,cap:'#8a7050',cap2:'#a89068',gill:'#e8dcc0',eggs:4}},
 {id:'marasmiellus',n:'皮微皮伞',en:'Marasmiellus candidus',biome:'bamboo',seasons:[2,3],r:0,edi:'inedible',sub:'ground',host:null,rain:false,
@@ -302,19 +304,19 @@ const SP=[
  lore:'翠玉镶金的巨大层菌，盘踞古树千年。指尖抚过环纹，能感到一下极缓的、大地般的心跳。',
  art:{shape:'shelf',h:30,w:40,cap:'#2f7d5b',cap2:'#4aa078',gill:'#d9e8c8',layers:2,zones:true,rimC:'#d9b84a',slime:true}},
 /* ---------- 灵境秘林 grove 新增（E3 批C） ---------- */
-{id:'moonveil',n:'月华伞',en:'Moonveil Cap',biome:'grove',seasons:[0,1,2,3],r:4,edi:'inedible',sub:'grass',host:null,rain:false,glow:'#eaf2ff',
+{id:'moonveil',n:'月华伞',en:'Moonveil Cap',biome:'grove',seasons:[0,1,2,3],r:3,edi:'inedible',sub:'grass',host:null,rain:false,glow:'#eaf2ff',
  lore:'满月夜里才显真容的银白伞盖，伞顶一点莹白似凝住的月光。旅人说，摘下它的刹那，云隙会漏下一线真正的月辉。',
  art:{shape:'umbo',h:28,w:28,cap:'#9aa4c2',cap2:'#c2ccdd',gill:'#e8ecf7',stemC:'#dfe4f5',sw:.22,specks:9,speckC:'#f5f8ff',umboC:'#f5f8ff',glow:'#eaf2ff'}},
 {id:'starcore',n:'星髓菇',en:'Starcore Stalk',biome:'grove',seasons:[3],r:3,edi:'inedible',sub:'ground',host:null,rain:false,glow:'#9a7ae0',
  lore:'深冬的灵境里立起一根幽紫的菌柱，顶端的孢囊像凝固的星屑，彻夜低吟着听不懂的光之语言。',
  art:{shape:'club',h:26,w:11,cap:'#9a7ae0',stemC:'#3a2b52',headFrac:.36,scab:true,glow:'#9a7ae0'}},
-{id:'veilmist',n:'幻雾冠',en:'Veilmist Crown',biome:'grove',seasons:[0],r:4,edi:'inedible',sub:'ground',host:null,rain:false,glow:'#9af0c6',
+{id:'veilmist',n:'幻雾冠',en:'Veilmist Crown',biome:'grove',seasons:[0],r:2,edi:'inedible',sub:'ground',host:null,rain:false,glow:'#9af0c6',
  lore:'春雾漫过灵境时才现身的半透明冠伞，网裙比竹林里的竹荪更加轻盈，指尖一碰便如烟一般散作雾气。',
  art:{shape:'veiled',h:30,w:13,cap:'#8fd8b0',stemC:'#eafaf0',sw:.2,net:8,alpha:.72,glow:'#9af0c6'}},
 {id:'candlecap',n:'灵烛菌',en:'Candlecap Wisp',biome:'grove',seasons:[0,1,2,3],r:3,edi:'med',sub:'stump',host:null,rain:false,glow:'#ffd76a',
  lore:'老树桩上立着一豆不灭的烛火，伞面淌着蜡油般的黏光，暖意能焐热雪夜里冻僵的手。灵药铺子最爱收它入方。',
  art:{shape:'convex',h:24,w:18,cap:'#ffd76a',cap2:'#ffe8a0',gill:'#f0c860',stemC:'#e8c060',sw:.2,slime:true,glow:'#ffd76a'}},
-{id:'dreamjelly',n:'梦缘胶菇',en:'Dreambound Jelly',biome:'grove',seasons:[2,3],r:4,edi:'inedible',sub:'trunk',host:null,rain:false,glow:'#d76adf',
+{id:'dreamjelly',n:'梦缘胶菇',en:'Dreambound Jelly',biome:'grove',seasons:[2,3],r:2,edi:'inedible',sub:'trunk',host:null,rain:false,glow:'#d76adf',
  lore:'古树伤疤处凝出一团紫粉色的胶质，触之微凉，据说枕着它入睡，能梦见从未去过的地方。',
  art:{shape:'jelly',h:22,w:26,cap:'#d76adf',cap2:'#f0a8ff',alpha:.85,glow:'#d76adf'}},
 /* ---------- 高山苔甸 alpine（E3 批C，新环境首批物种） ---------- */
@@ -354,8 +356,13 @@ const TOTAL=SP.length;
 
 /* ====================== P2 拟态 / 鉴别 ====================== */
 /* 安全种 -> 危险拟态。拟态个体生成时外观完全沿用安全种精灵渲染，真实身份存于 m.trueId */
-const MIMICS={button:'angel',straw:'deathcap',morel:'gyromitra'};
-/* 六个相关物种的手写鉴别特征（菌褶颜色 / 菌环菌托 / 气味） */
+/* E4 2：新增三对真实致命/危险拟态（均验证同 biome、季节有交集，安全种确实会在拟态对应环境刷出）：
+   puff(马勃,meadow)↔scleroderma(硬皮马勃,meadow，秋)——经典的「切开内部颜色」鉴别；
+   caesar(橙盖鹅膏,forest)↔panther(豹斑鹅膏,forest，夏秋同期)——菌褶颜色鉴别；
+   russula(正红菇,pine)↔deadlyweb(血红丝膜菌,pine，秋同期)——菌褶颜色 + 柄上丝膜鉴别。
+   竹荪蛋(bambooegg)↔鹅膏幼体一对因跨 biome（竹林 vs 阔叶林/湿地）生态牵强，按设计文档「宁缺毋滥」原则跳过。 */
+const MIMICS={button:'angel',straw:'deathcap',morel:'gyromitra',puff:'scleroderma',caesar:'panther',russula:'deadlyweb'};
+/* 十二个相关物种的手写鉴别特征（菌褶颜色 / 菌环菌托 / 气味；无菌褶的物种用该字段描述伞面或剖面等价特征） */
 const INSPECT_TRAITS={
   button:   {gill:'菌褶粉褐色，随成熟逐渐加深',   ring:'菌柄基部无菌托，仅有细微菌环痕迹',           smell:'气味温和，带松软菇香'},
   angel:    {gill:'菌褶纯白色，成熟后依旧洁白',   ring:'菌柄基部裹着明显的白色膜质菌托，柄上部有菌环', smell:'气味清淡略甜，不甚刺鼻'},
@@ -363,9 +370,16 @@ const INSPECT_TRAITS={
   deathcap: {gill:'菌褶纯白色，从不随成熟转色',   ring:'菌柄基部有肥厚的白色菌托，柄上部另有菌环',     smell:'初闻微甜，放久竟转腐臭'},
   morel:    {gill:'无菌褶，伞面呈规则蜂窝状凹坑', ring:'菌柄中空、表面光滑，基部无菌托',               smell:'清新的坚果与泥土香气'},
   gyromitra:{gill:'无菌褶，伞面呈不规则脑状皱褶', ring:'菌柄内部呈棉絮状，基部同样无菌托',             smell:'带轻微酸涩刺激气味，久闻微呛'},
+  puff:        {gill:'剖开内部洁白细腻，如嫩豆腐一般，无明显分层', ring:'菌柄粗短模糊，基部无菌托包裹',       smell:'气味清淡，带松软的菇香'},
+  scleroderma: {gill:'剖开内部呈紫黑色至黑褐色的实心肉质，并非洁白', ring:'外皮厚硬如革，基部同样无菌托',     smell:'气味发闷，带土腥味，并无菇香'},
+  caesar:      {gill:'菌褶金黄色，是鹅膏属里难得一见的黄褶',         ring:'菌柄基部有肥厚白色菌托，柄上部另有黄色菌环', smell:'气味清甜，带淡淡果香'},
+  panther:     {gill:'菌褶纯白色，不带任何黄色调',                   ring:'菌柄基部有膜质菌托，柄上部菌环较薄',         smell:'气味生涩，略带土豆般的生腥气'},
+  russula:     {gill:'菌褶洁白，伞盖艳红且色泽均匀',                 ring:'菌柄光滑洁白，无环无托',                     smell:'气味清新，带淡淡菌香'},
+  deadlyweb:   {gill:'菌褶橙褐色，伞缘裹着一层蛛丝状菌幕（丝膜）',   ring:'菌柄同色，无环无托，但柄上留有丝状纤毛残迹', smell:'初闻似萝卜般平淡，细品竟有异样'},
 };
 /* 拟态个体与安全种相异、需要标红警示对照的特征字段（每对 1-2 条） */
-const MIMIC_WARN_FIELDS={angel:['gill','ring'],deathcap:['gill','smell'],gyromitra:['gill','smell']};
+const MIMIC_WARN_FIELDS={angel:['gill','ring'],deathcap:['gill','smell'],gyromitra:['gill','smell'],
+  scleroderma:['gill','smell'],panther:['gill'],deadlyweb:['gill','ring']};
 /* 图鉴详情页互链提示文案 */
 const MIMIC_TIPS={
   button:'留意菌褶颜色——纯白菌褶加基部菌托，是危险的信号。',
@@ -374,6 +388,12 @@ const MIMIC_TIPS={
   deathcap:'留意基部菌托——草菇菌托薄软无环，毒鹅膏菌托肥厚且柄上另有菌环。',
   morel:'留意伞面纹理——羊肚菌是规则蜂窝状凹坑，鹿花菌是不规则脑状皱褶。',
   gyromitra:'留意伞面纹理——羊肚菌是规则蜂窝状凹坑，鹿花菌是不规则脑状皱褶。',
+  puff:'留意剖开内部——马勃内部洁白细腻，硬皮马勃切开则是紫黑色实心，切开一看便知真假。',
+  scleroderma:'留意剖开内部——马勃内部洁白细腻，硬皮马勃切开则是紫黑色实心，切开一看便知真假。',
+  caesar:'留意菌褶颜色——橙盖鹅膏菌褶金黄，豹斑鹅膏菌褶纯白，伞面斑纹也有细微差异。',
+  panther:'留意菌褶颜色——橙盖鹅膏菌褶金黄，豹斑鹅膏菌褶纯白，伞面斑纹也有细微差异。',
+  russula:'留意菌褶颜色与菌柄丝膜——正红菇菌褶洁白、菌柄光滑，血红丝膜菌菌褶橙褐且柄上裹着蛛丝状菌幕。',
+  deadlyweb:'留意菌褶颜色与菌柄丝膜——正红菇菌褶洁白、菌柄光滑，血红丝膜菌菌褶橙褐且柄上裹着蛛丝状菌幕。',
 };
 /* ====================== P4 新鲜度 + 一天一局 ====================== */
 /* 每过 1 天的新鲜度衰减速率：默认 default；速朽（鬼伞类）0.75；耐存（松露/灵芝/木耳/金针菇）0.10 */

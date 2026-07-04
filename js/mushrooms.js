@@ -871,10 +871,20 @@ function getSprite(id,variant){
   SPRITE[key]=sr;
   return sr;
 }
-function spriteURL(id,variant){const sr=getSprite(id,variant);return sr?sr.canvas.toDataURL():'';}
+/* E4 1：图鉴 101 格网格每次筛选都会重建整屏 <img>，spriteURL/silhouetteURL 的 toDataURL() 编码本身有开销——
+   两者都是纯函数（同 id/variant 恒定输出，paintMushroom 用 mulberry32(hash(id)) 定种子渲染），按结果缓存一次即可，
+   避免同一物种在每次开图鉴/切换筛选时被反复重新编码。 */
+const SPRITE_URL_CACHE={},SILH_URL_CACHE={};
+function spriteURL(id,variant){
+  const key=variant?id+':'+variant:id;
+  if(SPRITE_URL_CACHE[key])return SPRITE_URL_CACHE[key];
+  const sr=getSprite(id,variant);
+  return SPRITE_URL_CACHE[key]=(sr?sr.canvas.toDataURL():'');
+}
 function silhouetteURL(sp){
+  if(SILH_URL_CACHE[sp.id])return SILH_URL_CACHE[sp.id];
   const sr=SPRITE[sp.id];const cn=mkCanvas(sr.canvas.width,sr.canvas.height);
   const c=cn.getContext('2d');c.drawImage(sr.canvas,0,0);
   c.globalCompositeOperation='source-in';c.fillStyle='#8a7c62';c.fillRect(0,0,cn.width,cn.height);
-  return cn.toDataURL();
+  return SILH_URL_CACHE[sp.id]=cn.toDataURL();
 }
